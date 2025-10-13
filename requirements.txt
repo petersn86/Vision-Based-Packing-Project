@@ -1,0 +1,6 @@
+## ⚙️ **requirements.txt**
+
+# Core dependencies
+opencv-python
+tqdm
+

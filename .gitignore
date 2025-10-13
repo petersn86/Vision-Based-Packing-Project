@@ -1,0 +1,27 @@
+# Ignore extracted video frames
+data/frames/*
+!data/frames/.gitkeep
+data/videos/*
+!data/videos/.gitkeep
+
+
+# ----- Misc. -----
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# VSCode settings
+.vscode/
+
+# Mac system files
+.DS_Store
+
+# Logs and temporary files
+*.log
+*.tmp
