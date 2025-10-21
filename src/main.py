@@ -12,12 +12,20 @@
 #
 ##############################################
 
-from video_processor import extractFrames
+from video_processor            import extractFrames
+from detection.frame_loader     import loadFrames
+from detection.object_detector  import ObjectDetector
 import sys
 
 # Setup driver function
 def main(videoPath):
-    frames = extractFrames(videoPath, "../data/frames")
+    frames      = extractFrames(videoPath, "../data/frames") # might not need 'frames'
+    framesData  = loadFrames("../data/frames")
+    detector    = ObjectDetector()
+
+    for f in framesData:
+        detections = detector.detectObjects(f["frame"])
+        print(f"Frame {f['index']} detections:", detections)
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:

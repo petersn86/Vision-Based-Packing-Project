@@ -25,3 +25,6 @@ env/
 # Logs and temporary files
 *.log
 *.tmp
+
+# YOLO module
+*.pt
