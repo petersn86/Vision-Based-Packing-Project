@@ -21,7 +21,7 @@ import sys
 def main(videoPath):
     frames      = extractFrames(videoPath, "../data/frames", 2.0) # might not need 'frames'
     framesData  = loadFrames("../data/frames")
-    detector    = ObjectDetector("../models/yolov8n.pt", "../models/cardboard_boxYOLO.pt")
+    detector    = ObjectDetector("../models/yolo11m.pt", "../models/cardboard_boxYOLO.pt")
 
     for f in framesData:
         detections = detector.detectObjects(f["frame"])

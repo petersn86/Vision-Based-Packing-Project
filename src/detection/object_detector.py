@@ -19,15 +19,15 @@ from typing import List, Dict
 class ObjectDetector:
 
     # Initialize OOD
-    def __init__(self, modelPath: str = "yolov8n.pt", boxModelPath: str = None):
+    def __init__(self, modelPath: str = "yolo11m.pt", boxModelPath: str = None):
 
-        print(f"[INFO] Loading YOLOv8 model: {modelPath}")
+        print(f"[INFO] Loading YOLO11 model: {modelPath}")
         self.model  = YOLO(modelPath)
 
         # Optional second model for detecting boxes
         self.box_model = None
         if boxModelPath:
-            print(f"[INFO] Loading secondary YOLOv8 model (box detector): {boxModelPath}")
+            print(f"[INFO] Loading secondary YOLO model (box detector): {boxModelPath}")
             self.box_model = YOLO(boxModelPath)
 
     # Create Detect Objects Functionality
