@@ -18,6 +18,8 @@ The project integrates **computer vision (OpenCV)** for object detection and tra
 
 ## ⚙️ Tech Stack
 - **Python 3.10+**
-- **OpenCV** – image and video processing  
-- **tqdm**   - terminal progress bar lib
+- **OpenCV**        – image and video processing  
+- **tqdm**          - terminal progress bar lib
+- **Numpy**         - library for matrix computations
+- **Ultralytics**   - YOLO computer vision modeling
 
