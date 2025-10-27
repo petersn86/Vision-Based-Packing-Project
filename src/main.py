@@ -19,9 +19,9 @@ import sys
 
 # Setup driver function
 def main(videoPath):
-    frames      = extractFrames(videoPath, "../data/frames") # might not need 'frames'
+    frames      = extractFrames(videoPath, "../data/frames", 2.0) # might not need 'frames'
     framesData  = loadFrames("../data/frames")
-    detector    = ObjectDetector()
+    detector    = ObjectDetector("../models/yolov8n.pt", "../models/cardboard_boxYOLO.pt")
 
     for f in framesData:
         detections = detector.detectObjects(f["frame"])
