@@ -23,13 +23,25 @@ def main(videoPath):
     framesData  = loadFrames("../data/frames")
     detector    = ObjectDetector("../models/yolo11m.pt", "../models/cardboard_boxYOLO.pt")
 
+    detectedItems = set() #Set for printing unique items / Use '[]' instead of 'set()' for list of all items
+
     for f in framesData:
         detections = detector.detectObjects(f["frame"])
-        print(f"Frame {f['index']} detections:", detections)
+        print(f"Frame {f['index']} detections:", detections)   
+        
+        for detection in detections: #For each frame detection Add detected item names to set 
+            detectedItems.add(detection['label']) # #Use detectedItems.append(detection['label']) for list of all items
+
+    print(f"\nFinished processing. All unique items found: {detectedItems}") #Terminal list of items    
+    outputFile = 'item_list.txt' #text file of items
+    with open(outputFile, 'w') as f:
+        for name in detectedItems: #Write all names in the file on a new line
+            f.write(f"{name}\n")
+    print(f"Successfully saved unique class names to {outputFile}") #List confirmation
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         videoPath = sys.argv[1]
     else: # ignore this for now
-        videoPath = "data/videos/packing_video.mp4"  # default video path
+        videoPath = "data/videos/packing_video.mp4"  # default video path 
     main(videoPath)
