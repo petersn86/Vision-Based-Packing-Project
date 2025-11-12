@@ -1,6 +1,464 @@
+<<<<<<< Updated upstream
 apple
 cell phone
 scissors
 cardboard
 bottle
 person
+=======
+Tissue
+Soap Bottle
+Calculator
+Apple
+Screwdriver
+Dumbbell
+Towel
+Sleep Mask
+Scissors
+Computer Mouse
+Glasses
+Cell Phone
+Blanket
+Coffee mug
+Notebook
+Flashlight
+Pair of socks
+Deck of cards
+Candle
+Scarf
+Toothbrush
+Water bottle
+Book
+Keychain
+Phone charger
+Pen
+Hairbrush
+Small mirror
+Earphones
+T-shirt
+Puzzle
+Snack bar
+Lip balm
+Travel pillow
+Wallet
+Lighter
+Bar of soap
+Pair of gloves
+USB drive
+Sticky notes
+Small plant
+Tape
+Ruler
+Pouch
+Wristwatch
+Magnet
+Lamp
+Trading Card
+Flag
+Cup
+Thumb drive case
+Bookmark magnet
+Guitar pick
+Drumstick
+Plectrum holder
+Music sheet clip
+Camera memory wallet
+Battery tester
+Remote key fob
+Car key
+Key organizer
+Coin sorter
+Letter opener
+Name badge
+Visitor pass
+Sticky tack
+Binder spine label
+Desk nameplate
+Clip-on light
+LED strip
+Cable splitter
+Power adapter
+Charger dock
+Phone ring holder
+Smartwatch strap
+Stylus pen
+Tablet cover
+Laptop sleeve
+Mouse wrist rest
+Webcam cover
+HDMI adapter
+Ethernet cable
+USB hub
+Game controller
+Console cartridge
+Game disc
+Memory expansion card
+Controller battery pack
+Headphone case
+Microphone pop filter
+Tripod head
+Lens cleaning cloth
+Camera remote
+Lens hood
+Polaroid photo sleeve
+Photo album
+Poster tube
+Blueprint roll
+Paper trimmer
+Craft knife
+Glue bottle
+Paint palette
+Art eraser
+Stencil
+Drawing compass
+Calligraphy pen
+Ink refill bottle
+Chalkboard
+Whiteboard
+Magnet clip
+Pin cushion
+Sewing pattern
+Fabric patch
+Thread bobbin
+Elastic cord
+Bead string
+Jewelry clasp
+Charm bead
+Lanyard
+Cable sleeve
+Rubber mat
+Coaster holder
+Bottle opener ring
+Wine stopper
+Jar opener
+Tea strainer
+Coffee scoop
+Sugar spoon
+Pepper grinder
+Salt shaker
+Napkin holder
+Placemat
+Cutlery holder
+Tongs
+Measuring scoop
+Food clip
+Fruit peeler
+Egg timer
+Thermometer
+Meat thermometer
+Pan scraper
+Ice cube tray
+Baking mold
+Cookie stamp
+Pastry brush
+Bottle label
+Jar tag
+Kitchen magnet
+Bag clip
+Spray nozzle
+Soap pump
+Sponge holder
+Sink strainer
+Cleaning brush
+Dust cloth
+Lint brush
+Feather duster
+Garment bag
+Button box
+Thread cutter
+Cloth tag
+Ironing board cover
+Laundry clip bag
+Hose nozzle
+Plant stake
+Watering can
+Fertilizer scoop
+Seedling pot
+Garden trowel
+Plant mister
+Weeder
+Sprinkler head
+Bird feeder
+Thermostat
+Light switch cover
+Power strip
+Extension plug
+Cable management box
+Remote caddy
+Wall hook
+Door stopper
+Door hanger
+Drawer knob
+Cabinet handle
+Picture hook
+Nail
+Screw
+Bolt
+Nut
+Washer
+Allen key
+Wrench
+Measuring caliper
+Glue gun
+Sandpaper
+Paint roller
+Paint tray
+Putty knife
+Caulk tube
+Utility blade
+Tool belt
+Work gloves
+Safety glasses
+Dust mask
+Ear protection
+Flashlight battery
+Battery case
+Rope
+Bungee cord
+Tape measure clip
+Level
+Stud finder
+Wire cutter
+Soldering iron
+Screw cap
+Drill bit
+Saw blade
+Clamp
+Vice grip
+Workbench mat
+Oil can
+Grease tube
+Lubricant spray
+Small funnel filter
+Tool label
+Parts tray
+Storage bin
+Drawer divider
+Mini clipboard
+Document sleeve
+Name label
+Plastic ID holder
+Desk tray
+Pen holder
+Letter tray
+Calendar pad
+Appointment book
+Index card
+File folder
+Paper fastener
+Clipboard clip
+Desk lamp shade
+Paper shredder bin
+USB fan
+Cable adapter
+Router antenna
+Ethernet splitter
+Network cable
+HDMI switch
+Monitor stand
+Keyboard cover
+Webcam mount
+Earbud tips
+Bluetooth dongle
+Speaker grill
+Battery charger
+Solar charger
+Power bank
+SIM ejector tool
+Microphone cover
+Windshield mount
+Car vent clip
+Dash cam
+Car air freshener
+Seatbelt clip
+Sunglasses holder
+Car charger
+Phone magnet mount
+Keyless remote
+Parking ticket holder
+Tire gauge
+Fuse
+Air pump needle
+Valve cap
+Tool pouch
+Work ID badge
+Locker key
+Gym tag
+Waterproof pouch
+Locker lock
+Treadmill clip
+Yoga strap
+Resistance band
+Jump rope
+Sweatband
+Whistle lanyard
+Scorecard
+Stopwatch
+Sports armband
+Hand grip
+Golf tee
+Tennis ball
+Baseball glove
+Fishing lure
+Bobber
+Hook
+Line spool
+Compass whistle
+Hiking clip
+Map case
+Trail tag
+Tent peg
+Guy line
+Camping mug
+Camping spoon
+Fire starter flint
+Bug repellent
+Sunscreen stick
+Flashlight clip
+Headlamp strap
+Belt clip
+Binocular strap
+Compass pouch
+Signal mirror
+Whistle keychain
+Mini first-aid card
+Bandage tape
+Alcohol wipe
+Ointment tube
+Emergency whistle
+Pocket guide
+Notebook band
+Document clip
+Plastic ruler
+Transparent protractor
+Triangle ruler
+Drawing template
+Desk calendar
+Easel
+Poster stand
+Brochure holder
+Clipboard folder
+Badge clip
+Conference tag
+ID lanyard
+Ticket lanyard
+Event wristband
+Nameplate tag
+Visitor sticker
+Promotional pen
+Sticker label roll
+Wristband tag
+Plastic cup lid
+Straw cleaner
+Reusable utensil
+Lunch wrap
+Snack container
+Ice pack cover
+Meal label
+Plastic divider
+Silicone band
+Drink stir stick
+Coffee sleeve
+Coaster pad
+Cup holder
+Utensil case
+Cutlery wrap
+Paper food tray
+Cake topper
+Baking cup
+Recipe card
+Oven thermometer
+BBQ skewer
+Napkin dispenser
+Serving tong
+Drink marker
+Bottle charm
+Wine tag
+Table clip
+Food flag
+Dish label
+Snack scoop
+Condiment bottle
+Beverage opener
+Drink cap
+Party favor
+Confetti packet
+Balloon clip
+Streamer roll
+Gift bow
+Gift ribbon
+Invitation card
+Thank-you note
+Envelope liner
+Wax seal
+Paper rose
+Gift sticker
+Tag string
+Mini calendar card
+Magnetic clip
+Pin board
+Photo clip
+Polaroid frame
+Ticket stub holder
+Keepsake box
+Shadow box
+Mini easel
+Display stand
+Postcard rack
+Souvenir keychain
+Tote bag
+Coin bag
+Badge lanyard
+Phone wallet
+Travel ID case
+Boarding pass
+Map holder
+Compass case
+Pocket journal
+Pen loop
+Cable case
+Power cord
+Data cable
+Audio splitter
+Earphone case
+Adapter plug
+Power button cap
+Remote holder
+Battery organizer
+Cord label
+Wall charger
+Smart tag
+RFID card
+Key tracker
+Smart key fob
+Micro tracker
+USB light
+Portable fan
+Phone grip
+Camera mount
+Tripod clip
+Cable hook
+Screen wipe
+VR lens cloth
+Joystick cap
+Gaming headset
+Memory wallet
+Controller skin
+Keyboard brush
+Stylus nib
+Touchscreen glove
+Game card case
+Puzzle board
+Card binder
+Token tray
+Score sheet
+Dice bag
+Card mat
+Collector’s sleeve
+Toy coin
+Mini figurine stand
+Display case
+Art card
+Fan pin
+Collector badge
+>>>>>>> Stashed changes
