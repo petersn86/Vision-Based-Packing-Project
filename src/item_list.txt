@@ -1,11 +1,3 @@
-<<<<<<< Updated upstream
-apple
-cell phone
-scissors
-cardboard
-bottle
-person
-=======
 Tissue
 Soap Bottle
 Calculator
@@ -461,4 +453,3 @@ Display case
 Art card
 Fan pin
 Collector badge
->>>>>>> Stashed changes

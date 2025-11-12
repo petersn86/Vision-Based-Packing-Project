@@ -12,12 +12,6 @@
 #
 ##############################################
 
-<<<<<<< Updated upstream
-from video_processor            import extractFrames
-from detection.frame_loader     import loadFrames
-from detection.object_detector  import ObjectDetector
-import sys
-=======
 # main.py
 from video_processor import extractFrames
 from detection.frame_loader import loadFrames
@@ -26,31 +20,9 @@ from detection.frame_reasoner import FrameReasoner
 import sys, os
 import cv2 
 import shutil
->>>>>>> Stashed changes
 
 # Setup driver function
 def main(videoPath):
-<<<<<<< Updated upstream
-    frames      = extractFrames(videoPath, "../data/frames", 2.0) # might not need 'frames'
-    framesData  = loadFrames("../data/frames")
-    detector    = ObjectDetector("../models/yolo11m.pt", "../models/cardboard_boxYOLO.pt")
-
-    detectedItems = set() #Set for printing unique items / Use '[]' instead of 'set()' for list of all items
-
-    for f in framesData:
-        detections = detector.detectObjects(f["frame"])
-        print(f"Frame {f['index']} detections:", detections)   
-        
-        for detection in detections: #For each frame detection Add detected item names to set 
-            detectedItems.add(detection['label']) # #Use detectedItems.append(detection['label']) for list of all items
-
-    print(f"\nFinished processing. All unique items found: {detectedItems}") #Terminal list of items    
-    outputFile = 'item_list.txt' #text file of items
-    with open(outputFile, 'w') as f:
-        for name in detectedItems: #Write all names in the file on a new line
-            f.write(f"{name}\n")
-    print(f"Successfully saved unique class names to {outputFile}") #List confirmation
-=======
     frames_dir = "../data/frames" #where frames are saved
     annotated_dir = "../data/yolo_frames" #where YOLO frames go
     item_list_path = "item_list.txt" # The master list for Llama 
@@ -139,17 +111,10 @@ def main(videoPath):
             f.write(f"{name}\n")
     print(f"\nSuccessfully saved unique refined items to {final_output_file}")
 
->>>>>>> Stashed changes
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         videoPath = sys.argv[1]
-<<<<<<< Updated upstream
     else: # ignore this for now
         videoPath = "data/videos/packing_video.mp4"  # default video path 
     main(videoPath)
-=======
-    else:
-        videoPath = "data/videos/packing_video.mp4"  # default path
-    main(videoPath)
->>>>>>> Stashed changes
