@@ -15,7 +15,7 @@
 # main.py
 from video_processor import extractFrames
 from detection.frame_loader import loadFrames
-from detection.object_detector import ObjectDetector, save_frame_with_boxes 
+from detection.object_detector import ObjectDetector
 from detection.frame_reasoner import FrameReasoner
 import sys, os
 import cv2 
@@ -67,8 +67,6 @@ def main(videoPath):
 
         print(f"--- Processing Frame {f['index']} ({len(detections)} YOLO detections) ---")
 
-        annotated_path = os.path.join(annotated_dir, f"frame_{f['index']:04d}_boxed.jpg") #annotated frame for debugging (can remove)
-        save_frame_with_boxes(original_frame, detections, annotated_path)
 
         for det in detections: #Detection refinement for each detection
             yolo_label = det["label"]    
