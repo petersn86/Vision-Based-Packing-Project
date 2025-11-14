@@ -1,6 +1,6 @@
-##############################################
+#############################################################################
 # @Author: Peter Nolan
-# @Contributor(s): 
+# @Contributor(s):
 # @Document: 'main.py'
 #
 # Description:
@@ -10,109 +10,124 @@
 # modules for item recognition and box content analysis. Designed to serve as
 # the starting script for the full packing analysis process.
 #
-##############################################
+###############################################################################
 
-# main.py
-from video_processor import extractFrames
-from detection.frame_loader import loadFrames
-from detection.object_detector import ObjectDetector
-from detection.frame_reasoner import FrameReasoner
+from video_processor            import extractFrames
+from detection.frame_loader     import loadFrames
+from detection.object_detector  import ObjectDetector
+from detection.frame_reasoner   import FrameReasoner
 import sys, os
-import cv2 
-import shutil
+import cv2
 
 # Setup driver function
+
 def main(videoPath):
-    frames_dir = "../data/frames" #where frames are saved
-    annotated_dir = "../data/yolo_frames" #where YOLO frames go
-    item_list_path = "item_list.txt" # The master list for Llama 
-    final_output_file = "refined_item_list.txt" # The final list for Llama
 
-    # Ensure output dirs exist
-    os.makedirs(frames_dir, exist_ok=True)
-    os.makedirs(annotated_dir, exist_ok=True)
+    # Setup variables
+    framesDir           = "../data/frames"
+    annotatedDir        = "../data/yolo_frames"
+    item_list_path      = 'item_list.txt' # -- remove this ?
+    final_output_file   = "refined_item_list.txt" # -- adjust this ?
 
-    if not os.path.exists(item_list_path): #check for item list
-        print(f"[ERROR] Master item list not found at: {item_list_path}")
-        print("Please create this file with one item name per line.")
-        sys.exit(1)
+    # Extract frames
+    print(f"[INFO] Extracting frames from video: {videoPath}")
+    extractFrames(videoPath, framesDir, 2.0)
 
-    if os.path.exists(frames_dir): #check for frames folder
-        print(f"[INFO] Clearing old frames from: {frames_dir}")
-        shutil.rmtree(frames_dir) #removing frames from folder so that it doesn't analyze past frames in the folder
+    # Load frames
+    framesData           = loadFrames(framesDir)
 
-    print(f"[INFO] Extracting frames from video: {videoPath}") # Extract frames
-    extractFrames(videoPath, frames_dir, 2.0)
-    
-    framesData = loadFrames(frames_dir) # Load frames
-    
-    detector = ObjectDetector("../models/yolo11m.pt", "../models/cardboard_boxYOLO.pt") # Initialize Detector
+    # Create detector object for detections
+    detector            = ObjectDetector("../models/yolo11l.pt", "../models/cardboard_boxYOLO.pt")
 
-    reasoner = FrameReasoner( # Initialize Llama vision reasoner
-        item_list_path=item_list_path,
-        model_name="llama3.2-vision"
+    # Load reasoner -- adjust item_list_path?
+    reasoner            = FrameReasoner(
+            item_list_path = item_list_path,
+            model_name = "llama3.2-vision"
     )
 
-    print("[INFO] Running YOLO detection and Llama refinement on all frames...")
+    print("[INFO] Running YOLO detections and Llama refinement on all frames...")
 
-    final_refined_items = set() #Set for printing unique items
-    
-    ignore_labels = {"person", "people", "cardboard", "box"} # Skipping body and box labels
+    # Set for printing items
+    finalItems          = set()
 
+    # Ignore these labels
+    ignoreLabels        = {"person", "people", "cardboard", "box"}
+
+    # Iterate through the frame data
     for f in framesData:
-        original_frame = f["frame"]
-        detections = detector.detectObjects(original_frame)    
+        originalFrame   = f["frame"]
+        detections      = detector.detectObjects(originalFrame) # Run YOLO on frame
+
         if not detections:
             continue
 
         print(f"--- Processing Frame {f['index']} ({len(detections)} YOLO detections) ---")
 
+        # ------ DRAW BOUNDING BOX ------ #
+        # annotatedFrame  = originalFrame.copy()
+        # for det in detections:
+        #     label       = det["label"]
+        #     conf        = det.get("confidence", 0)
+        #     x1,y1,x2,y2 = det["bbox"]
+        #     color       = (0, 255, 0)
+        #     cv2.rectangle(annotatedFrame, (x1,y1), (x2,y2), color, 2)
+        #     cv2.putText(
+        #         annotatedFrame,
+        #         f"{label} {conf:.2f}",
+        #         (x1, y1 - 10),
+        #         cv2.FONT_HERSHEY_SIMPLEX,
+        #         0.6,
+        #         color,
+        #         2
+        #     )
+        
+        # annotatedPath   = os.path.join(annotatedDir, f"frame_{f['index']:04d}.jpg")
+        # cv2.imwrite(annotatedPath, annotatedFrame)
+        # --------------------------------- #
 
-        for det in detections: #Detection refinement for each detection
-            yolo_label = det["label"]    
-            if yolo_label.lower() in ignore_labels:
+        for det in detections:
+            yoloLabel       = det["label"]
+            if yoloLabel.lower() in ignoreLabels:
                 continue
 
             # Crop the object from the frame
-            x1, y1, x2, y2 = det['bbox']
-            cropped_image = original_frame[y1:y2, x1:x2]
+            x1,y1,x2,y2     = det['bbox']
+            croppedImage    = originalFrame[y1:y2, x1:x2]
+            annotatedPath   = os.path.join(annotatedDir, f"frame_{f['index']:04d}.jpg")
+            cv2.imwrite(annotatedPath, croppedImage)
 
-            
-            if cropped_image.size == 0: # Ensure crop is valid
-                print(f"[WARNING] Skipping empty crop for label '{yolo_label}' in frame {f['index']}")
+            if croppedImage.size == 0:
+                print(f"[WARNING] Skipping empty crop for label '{yoloLabel}' in frame {f['index']}")
                 continue
-         
-            refined_label = reasoner.refine_detection(cropped_image, yolo_label) # Ask Llama to refine this specific crop
-            
-            if refined_label: # If Llama returned a valid, refined label, add it to our final set
-                if refined_label not in final_refined_items:
-                    print(f"  [NEW ITEM] YOLO ('{yolo_label}') -> Llama ('{refined_label}')")
-                    final_refined_items.add(refined_label)
+
+            refinedLabel    = reasoner.refineDetection(croppedImage, yoloLabel)
+
+            # Handle reasoned items
+            if refinedLabel:
+                if refinedLabel not in finalItems: # Doing only unique objects, fix this ?
+                    print(f"     [NEW ITEM] YOLO ('{yoloLabel}') -> Llama ('{refinedLabel}')")
+                    finalItems.add(refinedLabel)
                 else:
-                    print(f"  [CONFIRMED] YOLO ('{yolo_label}') -> Llama ('{refined_label}')") # We've seen it before, but it's good to see the confirmation
+                    print(f"     [CONFIRMED] YOLO ('{yoloLabel}') -> Llama ('{refinedLabel}')")
+
             else:
-                print(f"  [DISCARDED] Llama discarded YOLO label '{yolo_label}'") # Llama returned 'None' or an invalid response
+                print(f" [DISCARDED] Llama discared YOLO label '{yoloLabel}'")
 
-
-    # Final Output
     print("\n--- Processing Complete ---")
-    
-    final_item_list = sorted(list(final_refined_items))  # Convert set to a sorted list 
 
-
-    print(f"Finished processing. Found {len(final_item_list)} unique items:") #Terminal list of items    
-    for item in final_item_list:
+    finalItemsList      = sorted(list(finalItems))
+    print(f"Finished processing. Found {len(finalItemsList)} unique items:")
+    for item in finalItemsList:
         print(f"- {item}")
 
-    with open(final_output_file, 'w') as f: # Write final items to file
-        for name in final_item_list: #Write all names in the file on a new line
+    with open(final_output_file, 'w') as f:
+        for name in finalItemsList:
             f.write(f"{name}\n")
-    print(f"\nSuccessfully saved unique refined items to {final_output_file}")
-
+    print(f"\nSuccessfully saved items to {final_output_file}")
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         videoPath = sys.argv[1]
     else: # ignore this for now
-        videoPath = "data/videos/packing_video.mp4"  # default video path 
+        videoPath = "data/videos/packing_video.mp4" # default video path
     main(videoPath)

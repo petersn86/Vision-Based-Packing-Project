@@ -36,3 +36,4 @@ def cleanup_frames(frames_dir: str = "data/frames"):
 
 if __name__ == "__main__":
     cleanup_frames()
+    cleanup_frames("data/yolo_frames")

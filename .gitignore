@@ -3,7 +3,11 @@ data/frames/*
 !data/frames/.gitkeep
 data/videos/*
 !data/videos/.gitkeep
+data/yolo_frames/*
+!data/yolo_frames/.gitkeep
 
+# Ignore Generated Item List
+src/refined_item_list.txt
 
 # ----- Misc. -----
 # Byte-compiled / optimized / DLL files
