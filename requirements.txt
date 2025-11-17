@@ -5,3 +5,4 @@ opencv-python
 tqdm
 numpy
 ultralytics
+ollama
