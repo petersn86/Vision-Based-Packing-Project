@@ -45,6 +45,20 @@ def main(videoPath):
             model_name = "llama3.2-vision"
     )
 
+    # --- EXPERIMENTAL ---
+    print("\n[RAW FRAME REASONING RESULTS]")
+
+    rawFrames = [os.path.join(framesDir, f) for f in os.listdir(framesDir)
+                 if f.lower().endswith((".jpg", ".jpeg", ".png"))]
+    
+    reasonerItems = reasoner.rawFrameReasoning(rawFrames)
+
+    print("\n[RAW FRAME REASONING RESULTS]")
+    for i in reasonerItems:
+        print(f"- {i}")
+
+
+'''
     print("[INFO] Running YOLO detections and Llama refinement on all frames...")
 
     # Set for printing items
@@ -124,6 +138,8 @@ def main(videoPath):
         for name in finalItemsList:
             f.write(f"{name}\n")
     print(f"\nSuccessfully saved items to {final_output_file}")
+'''
+
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
