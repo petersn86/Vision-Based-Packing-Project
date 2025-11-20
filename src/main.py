@@ -26,8 +26,6 @@ def main(videoPath):
     # Setup variables
     framesDir           = "../data/frames"
     annotatedDir        = "../data/yolo_frames"
-    item_list_path      = 'item_list.txt' # -- remove this ?
-    final_output_file   = "refined_item_list.txt" # -- adjust this ?
 
     # Extract frames
     print(f"[INFO] Extracting frames from video: {videoPath}")
@@ -39,23 +37,27 @@ def main(videoPath):
     # Create detector object for detections
     detector            = ObjectDetector("../models/yolo11l.pt", "../models/cardboard_boxYOLO.pt")
 
-    # Load reasoner -- adjust item_list_path?
+    # Load reasoner
     reasoner            = FrameReasoner(
-            item_list_path = item_list_path,
             model_name = "llama3.2-vision"
     )
 
     # --- EXPERIMENTAL ---
     print("\n[RAW FRAME REASONING RESULTS]")
 
-    rawFrames = [os.path.join(framesDir, f) for f in os.listdir(framesDir)
-                 if f.lower().endswith((".jpg", ".jpeg", ".png"))]
+    rawFrames = [
+        os.path.join(framesDir, f)
+        for f in os.listdir(framesDir)
+        if f.lower().endswith((".jpg", ".jpeg", ".png"))
+    ]
     
-    reasonerItems = reasoner.rawFrameReasoning(rawFrames)
+    reasonerItems = reasoner.reason_frame_by_frame(rawFrames)
 
     print("\n[RAW FRAME REASONING RESULTS]")
-    for i in reasonerItems:
-        print(f"- {i}")
+    for item, count in reasonerItems.items():
+        print(f"- {item}: {count}")
+
+
 
 
 '''
