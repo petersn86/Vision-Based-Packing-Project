@@ -15,6 +15,8 @@ from detection.object_detector  import ObjectDetector
 from detection.frame_reasoner   import FrameReasoner
 import sys, os
 import cv2
+from pathlib import Path
+import csv
 
 def main(videoPath):
 
@@ -22,13 +24,26 @@ def main(videoPath):
     framesDir         = "../data/frames"
     annotatedDir      = "../data/yolo_frames"
     final_output_file = "refined_item_list.txt"
+    detection_log_file = "detection_log.csv"
 
-    # Extract frames
+    # Ensure annotated output directory exists (main.py previously didn't create it)
+    Path(annotatedDir).mkdir(parents=True, exist_ok=True)
+
+    # Extract frames (capture returned metadata to get timestamps)
     print(f"[INFO] Extracting frames from video: {videoPath}")
-    extractFrames(videoPath, framesDir, 2.0)
+    frames_meta = extractFrames(videoPath, framesDir, 2.0)
 
     # Load frames
     framesData = loadFrames(framesDir)
+
+    # Build mapping from filename -> timestamp (seconds)
+    meta_map = {}
+    try:
+        for m in frames_meta:
+            fname = os.path.basename(m.get('path', ''))
+            meta_map[fname] = m.get('timestamp', None)
+    except Exception:
+        meta_map = {}
 
     # Object detector (YOLO models)
     detector = ObjectDetector(
@@ -41,6 +56,12 @@ def main(videoPath):
 
     print("[INFO] Running YOLO detections and LLaMA refinement on frames...")
 
+    # Prepare detection log CSV
+    # Order goes frame_index, filename, timestamp_s, yolo_label, confidence, refined_label
+    csv_file = open(detection_log_file, 'w', newline='', encoding='utf-8')
+    csv_writer = csv.writer(csv_file)
+    csv_writer.writerow(["frame_index", "filename", "timestamp_s", "yolo_label", "confidence", "refined_label"])
+
     finalItems = set()    # Collect unique refined labels
     ignoreLabels = {"person", "people", "cardboard", "box"}
 
@@ -48,6 +69,9 @@ def main(videoPath):
     for f in framesData:
         originalFrame = f["frame"]
         detections = detector.detectObjects(originalFrame)
+
+        # Lookup timestamp for this frame (seconds)
+        timestamp = meta_map.get(f.get('filename'), None)
 
         if not detections:
             continue
@@ -71,25 +95,36 @@ def main(videoPath):
                 print(f"[WARNING] Skipping empty crop for label '{yoloLabel}' in frame {f['index']}")
                 continue
 
-            # Save crop with detection index to avoid overwriting
+            # Save crop with detection index and timestamp (if available) to avoid overwriting
+            ts_tag = f"t{int(timestamp*1000)}" if timestamp is not None else "t_unknown"
             cropPath = os.path.join(
                 annotatedDir,
-                f"frame_{f['index']:04d}_det_{det_idx}.jpg"
+                f"frame_{f['index']:04d}_{ts_tag}_det_{det_idx}.jpg"
             )
             cv2.imwrite(cropPath, croppedImage)
 
             # Refine with LLaMA
             refinedLabel = reasoner.refineDetection(croppedImage, yoloLabel)
 
-            # Print results
+            # Print results and log timestamped detection
             if refinedLabel:
                 if refinedLabel not in finalItems:
-                    print(f"  [NEW ITEM] YOLO: '{yoloLabel}' → LLaMA: '{refinedLabel}'")
+                    print(f"  [NEW ITEM] {timestamp}s YOLO: '{yoloLabel}' → LLaMA: '{refinedLabel}'")
                     finalItems.add(refinedLabel)
                 else:
-                    print(f"  [CONFIRMED] YOLO: '{yoloLabel}' → LLaMA: '{refinedLabel}'")
+                    print(f"  [CONFIRMED] {timestamp}s YOLO: '{yoloLabel}' → LLaMA: '{refinedLabel}'")
             else:
-                print(f"  [DISCARDED] LLaMA rejected YOLO label '{yoloLabel}'")
+                print(f"  [DISCARDED] {timestamp}s LLaMA rejected YOLO label '{yoloLabel}'")
+
+            # Write a row to the detection log (timestamp may be None)
+            csv_writer.writerow([
+                f.get('index'),
+                f.get('filename'),
+                timestamp,
+                yoloLabel,
+                det.get('confidence'),
+                refinedLabel
+            ])
 
     print("\n--- Processing Complete ---\n")
 
@@ -103,6 +138,9 @@ def main(videoPath):
     with open(final_output_file, 'w') as f:
         for name in finalItemsList:
             f.write(f"{name}\n")
+
+    # Close CSV log
+    csv_file.close()
 
     print(f"\n[INFO] Items saved to {final_output_file}")
 

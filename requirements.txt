@@ -6,3 +6,5 @@ tqdm
 numpy
 ultralytics
 ollama
+pathlib
+csv
