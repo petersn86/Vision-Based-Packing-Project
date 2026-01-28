@@ -5,6 +5,8 @@ data/videos/*
 !data/videos/.gitkeep
 data/yolo_frames/*
 !data/yolo_frames/.gitkeep
+uploads/*
+!uploads/.gitkeep
 
 # Ignore Generated Item List
 src/refined_item_list.txt
@@ -30,4 +32,7 @@ env/
 # Logs and temporary files
 *.log
 *.tmp
+
+# Extraneous
 detection_log.csv
+box_contents.json

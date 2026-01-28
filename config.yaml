@@ -1,0 +1,116 @@
+# Vision-Based Packing Project Configuration
+# ============================================
+
+# Video Processing Settings
+video:
+  # Time interval (seconds) between extracted frames
+  frame_interval: 2.0
+  
+  # Default video path if none provided
+  default_video: "data/videos/packing_video.mp4"
+
+# Directory Paths
+paths:
+  # Input/Output directories
+  frames_dir: "data/frames"
+  annotated_dir: "data/yolo_frames"
+  videos_dir: "data/videos"
+  
+  # Output files
+  refined_items_file: "refined_item_list.txt"
+  detection_log_file: "detection_log.csv"
+  annotated_video_file: "data/output_annotated.mp4"
+
+# YOLO Detection Settings
+detection:
+  # Primary YOLO model path
+  yolo_model: "models/yolo11l.pt"
+  
+  # Secondary box detection model (optional)
+  box_model: "models/cardboard_boxYOLO.pt"
+  
+  # Confidence threshold for detections (0.0 - 1.0)
+  confidence_threshold: 0.35
+  
+  # Labels to ignore during detection
+  ignore_labels:
+    - "person"
+    - "people"
+    - "cardboard"
+    - "box"
+
+# LLaMA Vision Settings
+llama:
+  # Ollama model name
+  model_name: "llama3.2-vision"
+  
+  # Enable/disable LLaMA refinement
+  enabled: true
+  
+  # Retry settings for failed API calls
+  max_retries: 3
+  retry_delay: 1.0
+
+# Object Tracking Settings (ByteTrack - Quick Win #2)
+tracking:
+  # Enable object tracking
+  enabled: true
+  
+  # ByteTrack parameters (preferred - better for occlusions)
+  track_thresh: 0.5         # High-confidence detection threshold
+  track_buffer: 30          # Frames to keep lost tracks alive
+  match_thresh: 0.8         # IOU threshold for first association (high-conf)
+  second_match_thresh: 0.5  # IOU threshold for second association (low-conf recovery)
+  
+  # Legacy SORT parameters (for backwards compatibility)
+  # If track_thresh is not set, these will be used instead:
+  # max_age: 30
+  # min_hits: 3
+  # iou_threshold: 0.3
+
+# QR Code Detection Settings (for Quick Win #4)
+qr_detection:
+  # Enable QR code detection
+  enabled: true
+  
+  # Proximity threshold (pixels) for item-to-box mapping
+  proximity_threshold: 100
+
+# Output Settings
+output:
+  # Generate annotated video
+  create_video: true
+  
+  # Video codec for output (mp4v, x264, etc.)
+  video_codec: "mp4v"
+  
+  # Video frame rate
+  video_fps: 10
+  
+  # Save individual annotated frames
+  save_annotated_frames: true
+  
+  # Export format for results (csv, json, both)
+  export_format: "both"
+
+# Logging Settings
+logging:
+  # Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  level: "INFO"
+  
+  # Log file path
+  log_file: "app.log"
+  
+  # Console output
+  console_output: true
+
+# Performance Settings
+performance:
+  # Use GPU if available
+  use_gpu: true
+  
+  # Batch size for YOLO processing
+  batch_size: 1
+  
+  # Number of worker threads
+  num_workers: 4
