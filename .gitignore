@@ -30,3 +30,4 @@ env/
 # Logs and temporary files
 *.log
 *.tmp
+detection_log.csv
