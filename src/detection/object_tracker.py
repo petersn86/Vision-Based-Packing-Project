@@ -1,7 +1,7 @@
 ##############################################
 # @Author: Peter Nolan
 # @Contributor(s):
-# @Document: 'bytetrack_tracker.py'
+# @Document: 'object_tracker.py'
 #
 # Description:
 # Implements ByteTrack algorithm for object tracking.

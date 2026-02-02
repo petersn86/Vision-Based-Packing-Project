@@ -1,9 +1,11 @@
-The object in the image is a cardboard box
 backpack
 bed
 bed
 
-Answer: bed
+Corrected answer: None
+bed
+
+I'm sorry, but I'm not sure what the object in the image is. It could be a bed, but it's hard to say for sure
 blanket
 book
 bottle
@@ -12,5 +14,5 @@ dryer
 hairdryer
 handbag
 laptop
-pillow
 umbrella
+water bottle
