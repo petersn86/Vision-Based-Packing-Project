@@ -7,3 +7,20 @@ numpy
 ultralytics
 ollama
 pathlib
+
+# Configuration management
+pyyaml
+
+# Object tracking
+filterpy
+scipy
+
+# QR code detection
+pyzbar
+
+# Web interface
+flask
+flask-cors
+
+# Additional utilities
+pillow

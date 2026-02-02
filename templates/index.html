@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vision-Based Packing Project</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 60px 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9ff;
+        }
+        
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+        
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background: #e8ebff;
+            transform: scale(1.02);
+        }
+        
+        .upload-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+        
+        .upload-area h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.5em;
+        }
+        
+        .upload-area p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .status-area {
+            display: none;
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9ff;
+            border-radius: 10px;
+        }
+        
+        .status-area.visible {
+            display: block;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .results-area {
+            display: none;
+            margin-top: 30px;
+        }
+        
+        .results-area.visible {
+            display: block;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .stat-card h3 {
+            font-size: 2.5em;
+            margin-bottom: 5px;
+        }
+        
+        .stat-card p {
+            opacity: 0.9;
+        }
+        
+        .items-list {
+            max-height: 400px;
+            overflow-y: auto;
+            background: #f8f9ff;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        
+        .items-list ul {
+            list-style: none;
+        }
+        
+        .items-list li {
+            padding: 10px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+        }
+        
+        .items-list li:before {
+            content: "📦";
+            margin-right: 10px;
+            font-size: 1.2em;
+        }
+        
+        .download-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .status-message {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        .status-processing {
+            background: #fff3cd;
+            color: #856404;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .status-complete {
+            background: #d4edda;
+            color: #155724;
+            border-left: 4px solid #28a745;
+        }
+        
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📦 Vision-Based Packing</h1>
+            <p>AI-Powered Video Analysis for Inventory Tracking</p>
+        </div>
+        
+        <div class="content">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">🎥</div>
+                <h3>Upload Packing Video</h3>
+                <p>Drag and drop or click to select</p>
+                <p style="font-size: 0.9em; color: #999;">Supported formats: MP4, AVI, MOV, MKV</p>
+                <input type="file" id="fileInput" accept="video/*">
+                <button class="btn" onclick="document.getElementById('fileInput').click()">
+                    Select Video
+                </button>
+            </div>
+            
+            <div class="status-area" id="statusArea">
+                <h3>Processing Status</h3>
+                <div class="spinner" id="spinner"></div>
+                <div id="statusMessage" class="status-message status-processing">
+                    Initializing...
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressBar">0%</div>
+                </div>
+            </div>
+            
+            <div class="results-area" id="resultsArea">
+                <h2>📊 Results</h2>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3 id="itemCount">0</h3>
+                        <p>Unique Items Detected</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="processingTime">--</h3>
+                        <p>Processing Time</p>
+                    </div>
+                </div>
+                
+                <h3>Detected Items:</h3>
+                <div class="items-list">
+                    <ul id="itemsList"></ul>
+                </div>
+                
+                <div class="download-buttons">
+                    <button class="btn" onclick="downloadFile('items')">
+                        📄 Download Item List
+                    </button>
+                    <button class="btn btn-secondary" onclick="downloadFile('log')">
+                        📊 Download Detection Log
+                    </button>
+                    <button class="btn btn-secondary" onclick="downloadFile('video')" id="downloadVideoBtn" style="display:none;">
+                        🎬 Download Annotated Video
+                    </button>
+                </div>
+                
+                <button class="btn" onclick="location.reload()" style="margin-top: 20px;">
+                    🔄 Process Another Video
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentJobId = null;
+        let statusCheckInterval = null;
+        
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const statusArea = document.getElementById('statusArea');
+        const resultsArea = document.getElementById('resultsArea');
+        
+        // Drag and drop handlers
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileUpload(files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileUpload(e.target.files[0]);
+            }
+        });
+        
+        async function handleFileUpload(file) {
+            const formData = new FormData();
+            formData.append('video', file);
+            
+            uploadArea.style.display = 'none';
+            statusArea.classList.add('visible');
+            
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    currentJobId = data.job_id;
+                    startStatusChecking();
+                } else {
+                    showError(data.error || 'Upload failed');
+                }
+            } catch (error) {
+                showError('Upload failed: ' + error.message);
+            }
+        }
+        
+        function startStatusChecking() {
+            statusCheckInterval = setInterval(checkStatus, 2000);
+        }
+        
+        async function checkStatus() {
+            if (!currentJobId) return;
+            
+            try {
+                const response = await fetch(`/status/${currentJobId}`);
+                const data = await response.json();
+                
+                updateStatus(data);
+                
+                if (data.status === 'completed') {
+                    clearInterval(statusCheckInterval);
+                    loadResults();
+                } else if (data.status === 'error') {
+                    clearInterval(statusCheckInterval);
+                    showError(data.message);
+                }
+            } catch (error) {
+                console.error('Status check failed:', error);
+            }
+        }
+        
+        function updateStatus(data) {
+            const statusMessage = document.getElementById('statusMessage');
+            const progressBar = document.getElementById('progressBar');
+            const spinner = document.getElementById('spinner');
+            
+            statusMessage.textContent = data.message;
+            
+            if (data.status === 'processing') {
+                statusMessage.className = 'status-message status-processing';
+                progressBar.style.width = '50%';
+                progressBar.textContent = 'Processing...';
+                spinner.style.display = 'block';
+            } else if (data.status === 'completed') {
+                statusMessage.className = 'status-message status-complete';
+                progressBar.style.width = '100%';
+                progressBar.textContent = 'Complete!';
+                spinner.style.display = 'none';
+            }
+        }
+        
+        async function loadResults() {
+            try {
+                const response = await fetch(`/results/${currentJobId}`);
+                const data = await response.json();
+                
+                document.getElementById('itemCount').textContent = data.item_count;
+                
+                const itemsList = document.getElementById('itemsList');
+                itemsList.innerHTML = '';
+                data.items.forEach(item => {
+                    const li = document.createElement('li');
+                    li.textContent = item;
+                    itemsList.appendChild(li);
+                });
+                
+                if (data.files && data.files.annotated_video) {
+                    document.getElementById('downloadVideoBtn').style.display = 'inline-block';
+                }
+                
+                statusArea.classList.remove('visible');
+                resultsArea.classList.add('visible');
+            } catch (error) {
+                showError('Failed to load results');
+            }
+        }
+        
+        function downloadFile(type) {
+            window.location.href = `/download/${type}`;
+        }
+        
+        function showError(message) {
+            const statusMessage = document.getElementById('statusMessage');
+            const spinner = document.getElementById('spinner');
+            statusMessage.className = 'status-message status-error';
+            statusMessage.textContent = message;
+            spinner.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
