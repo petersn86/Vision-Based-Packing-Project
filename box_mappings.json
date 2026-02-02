@@ -1,7 +1,64 @@
 {
-  "boxes": {},
+  "boxes": {
+    "BOX-3-2": [
+      {
+        "track_id": 16,
+        "label": "Pillow",
+        "timestamp": 6.0
+      }
+    ],
+    "BOX-5-0": [
+      {
+        "track_id": 17,
+        "label": "Bed",
+        "timestamp": 9.999
+      }
+    ],
+    "BOX-8-2": [
+      {
+        "track_id": 20,
+        "label": "Blanket",
+        "timestamp": 15.999
+      }
+    ],
+    "BOX-14-0": [
+      {
+        "track_id": 26,
+        "label": "Book",
+        "timestamp": 27.999
+      }
+    ],
+    "BOX-16-0": [
+      {
+        "track_id": 28,
+        "label": "Book",
+        "timestamp": 31.998
+      }
+    ],
+    "BOX-24-0": [
+      {
+        "track_id": 32,
+        "label": "Book",
+        "timestamp": 47.997
+      }
+    ],
+    "BOX-33-0": [
+      {
+        "track_id": 38,
+        "label": "Umbrella",
+        "timestamp": 65.996
+      }
+    ],
+    "BOX-44-0": [
+      {
+        "track_id": 45,
+        "label": "Laptop",
+        "timestamp": 87.995
+      }
+    ]
+  },
   "summary": {
-    "total_boxes": 0,
-    "total_items": 0
+    "total_boxes": 8,
+    "total_items": 8
   }
 }

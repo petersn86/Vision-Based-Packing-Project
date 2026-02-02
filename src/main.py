@@ -6,7 +6,8 @@
 # Description:
 # Main entry point for the Vision-Based-Packing-Project pipeline.
 # Extracts frames, runs YOLO detections, then refines labels using LLaMA
-# vision reasoning through Ollama.
+# vision reasoning through Ollama. Entry detection works for items already
+# in boxes OR items entering boxes.
 ###############################################################################
 
 from video_processor            import extractFrames
@@ -16,6 +17,7 @@ from detection.frame_reasoner   import FrameReasoner
 from detection.object_tracker   import ObjectTracker
 from detection.video_annotator  import VideoAnnotator
 from detection.qr_detector      import QRDetector, BoxItemMapper
+from detection.entry_detector   import EntryDetector
 import sys, os
 sys.path.insert(0, '..')        # Add parent directory to path
 from config_loader              import get_config
@@ -71,11 +73,10 @@ def main(videoPath=None):
     logger = setup_logging(config)
     
     logger.info("="*60)
-    logger.info("Vision-Based Packing Project - Integrated Pipeline")
+    logger.info("Vision-Based Packing Project - YOLO Box Entry Detection")
     logger.info("="*60)
 
     # ---------------- Paths ---------------- #
-    # FIX: Use config.get() not config.get_path() to avoid double directory creation
     framesDir = PROJECT_ROOT / config.get('paths.frames_dir', 'data/frames')
     framesDir.mkdir(parents=True, exist_ok=True)
 
@@ -91,10 +92,8 @@ def main(videoPath=None):
     # ---------------- Frame Extraction ---------------- #
     logger.info(f"Extracting frames from video: {videoPath}")
     frame_interval = config.get('video.frame_interval', 2.0)
-    # FIX: Convert Path to string for extractFrames
     frames_meta = extractFrames(str(videoPath), str(framesDir), frame_interval)
 
-    # FIX: Convert Path to string for loadFrames
     framesData = loadFrames(str(framesDir))
     logger.info(f"Loaded {len(framesData)} frames for processing")
 
@@ -124,8 +123,6 @@ def main(videoPath=None):
         
         if track_thresh is not None:
             logger.info(f"Object tracking enabled (ByteTrack mode)")
-            logger.info(f"  track_thresh={track_thresh}, track_buffer={track_buffer}")
-            logger.info(f"  match_thresh={match_thresh}, second_match_thresh={second_match_thresh}")
             tracker = ObjectTracker(
                 track_thresh=track_thresh or 0.5,
                 track_buffer=track_buffer or 30,
@@ -133,32 +130,37 @@ def main(videoPath=None):
                 second_match_thresh=second_match_thresh or 0.5
             )
         else:
-            # Fallback to SORT-style params
             max_age = config.get('tracking.max_age', 30)
-            min_hits = config.get('tracking.min_hits', 3)
-            iou_threshold = config.get('tracking.iou_threshold', 0.3)
             logger.info(f"Object tracking enabled (SORT compatibility mode)")
-            logger.info(f"  max_age={max_age}, min_hits={min_hits}, iou_threshold={iou_threshold}")
             tracker = ObjectTracker(
                 track_thresh=0.5,
                 track_buffer=max_age,
-                match_thresh=iou_threshold + 0.5,
-                second_match_thresh=iou_threshold
+                match_thresh=0.8,
+                second_match_thresh=0.5
             )
     else:
         logger.info("Object tracking disabled")
 
-    # ---------------- QR Detection ---------------- #
-    qr_enabled = config.get('qr_detection.enabled', True)
-    qr_detector = None
-    box_mapper = None
-    if qr_enabled:
-        proximity_threshold = config.get('qr_detection.proximity_threshold', 100)
-        logger.info(f"QR code detection enabled (proximity_threshold={proximity_threshold})")
-        qr_detector = QRDetector(proximity_threshold)
-        box_mapper = BoxItemMapper()
+    # ---------------- Box Detection (YOLO-based, no QR codes) ---------------- #
+    box_mapper = BoxItemMapper()
+    logger.info("Box detection via YOLO (no QR codes required)")
+
+    # ---------------- Entry Detection (YOLO boxes) ---------------- #
+    entry_enabled = config.get('entry_detection.enabled', True)
+    entry_detector = None
+    if entry_enabled:
+        entry_threshold = config.get('entry_detection.entry_threshold', 3)
+        exit_threshold = config.get('entry_detection.exit_threshold', 5)
+        overlap_threshold = config.get('entry_detection.overlap_threshold', 0.5)
+        require_motion = config.get('entry_detection.require_motion', False)
+        
+        logger.info(f"Entry detection enabled (using YOLO-detected boxes)")
+        logger.info(f"  entry_threshold={entry_threshold}, overlap={overlap_threshold}")
+        logger.info(f"  require_motion={require_motion} (items must move into boxes: {require_motion})")
+        
+        entry_detector = EntryDetector(entry_threshold, exit_threshold, require_motion)
     else:
-        logger.info("QR code detection disabled")
+        logger.info("Entry detection disabled - tracking ALL detections")
 
     # ---------------- LLaMA Reasoner ---------------- #
     llama_enabled = config.get('llama.enabled', True)
@@ -176,11 +178,10 @@ def main(videoPath=None):
     detections_per_frame = {}
     
     if video_output_enabled:
-        output_video_path = PROJECT_ROOT / config.get('paths.annotated_video_file', 'data/output_annotated.mp4')
+        output_video_path = PROJECT_ROOT / config.get('paths.annotated_video_file', 'data/videos/output_annotated.mp4')
         video_fps = config.get('output.video_fps', 10)
         video_codec = config.get('output.video_codec', 'mp4v')
         logger.info(f"Video annotation enabled (output: {output_video_path})")
-        # FIX: Convert Path to string
         annotator = VideoAnnotator(str(output_video_path), fps=video_fps, codec=video_codec)
 
     logger.info("Running detection pipeline...")
@@ -188,11 +189,14 @@ def main(videoPath=None):
     # ---------------- Detection Log ---------------- #
     csv_file = open(detection_log_file, 'w', newline='', encoding='utf-8')
     csv_writer = csv.writer(csv_file)
-    csv_writer.writerow(["frame_index", "filename", "timestamp_s", "yolo_label", "confidence", "refined_label", "track_id", "box_id"])
+    csv_writer.writerow(["frame_index", "filename", "timestamp_s", "yolo_label", "confidence", 
+                         "refined_label", "track_id", "box_id", "entry_detected"])
 
     finalItems = set()
     ignoreLabels = set(config.get('detection.ignore_labels', []))
     processed_tracks = set()
+    items_entered_boxes = {}  # track_id -> {label, box_id, timestamp}
+    detected_boxes_count = 0
 
     # ---------------- Main Frame Loop ---------------- #
     for f in framesData:
@@ -200,28 +204,40 @@ def main(videoPath=None):
         frame_idx = f['index']
         timestamp = meta_map.get(f.get('filename'), None)
 
+        # Get all detections
         detections = detector.detectObjects(originalFrame, confThresh=conf_threshold)
 
-        # QR Codes
-        qr_codes = []
-        if qr_detector:
-            qr_codes = qr_detector.detect_qr_codes(originalFrame)
-            if qr_codes:
-                qr_detector.update_boxes(qr_codes, frame_idx)
-                logger.debug(f"Frame {frame_idx}: Detected {len(qr_codes)} QR codes")
+        # Separate box detections from item detections
+        box_detections = []
+        item_detections = []
+        
+        for det in detections:
+            label_lower = det['label'].lower()
+            # Check if it's a box/cardboard detection
+            if 'box' in label_lower or 'cardboard' in label_lower:
+                box_detections.append(det)
+                logger.debug(f"Frame {frame_idx}: Detected box at {det['bbox']}")
+            elif label_lower not in ignoreLabels:
+                item_detections.append(det)
+        
+        if box_detections:
+            detected_boxes_count += len(box_detections)
+            logger.info(f"Frame {frame_idx}: Found {len(box_detections)} box(es), {len(item_detections)} item(s)")
 
-        # Object Tracking
+        # Object Tracking (only track items, not boxes)
         tracked_objects = []
         if tracker:
-            tracked_objects = tracker.update(detections)
-            logger.debug(f"Frame {frame_idx}: {len(tracked_objects)} tracked objects")
+            tracked_objects = tracker.update(item_detections)
+            logger.debug(f"Frame {frame_idx}: {len(tracked_objects)} tracked items, {len(box_detections)} boxes")
         else:
-            tracked_objects = [{**det, 'track_id': None} for det in detections]
+            tracked_objects = [{**det, 'track_id': None} for det in item_detections]
 
+        # For video annotation, include both items and boxes
         if video_output_enabled:
-            detections_per_frame[frame_idx] = tracked_objects
+            all_detections = tracked_objects + [{**box, 'track_id': None, 'label': f'BOX-{i}'} for i, box in enumerate(box_detections)]
+            detections_per_frame[frame_idx] = all_detections
 
-        # Process each tracked object
+        # Process each tracked item
         for obj in tracked_objects:
             track_id = obj.get('track_id')
             yoloLabel = obj["label"]
@@ -231,43 +247,92 @@ def main(videoPath=None):
             if yoloLabel.lower() in ignoreLabels:
                 continue
 
-            if tracker and track_id is not None and track_id in processed_tracks:
-                continue
-
-            x1, y1, x2, y2 = bbox
-            croppedImage = originalFrame[y1:y2, x1:x2]
-            if croppedImage.size == 0:
-                logger.warning(f"Skipping empty crop for '{yoloLabel}' in frame {frame_idx}")
-                continue
-
-            # Refine with LLaMA
-            refinedLabel = None
-            if reasoner:
-                refinedLabel = reasoner.refineDetection(croppedImage, yoloLabel)
-                if track_id is not None:
-                    processed_tracks.add(track_id)
-            else:
-                refinedLabel = yoloLabel
-
-            # Map to box
+            # Entry Detection Logic (using YOLO-detected boxes)
+            entry_detected = False
             box_id = None
-            if qr_detector and refinedLabel:
-                box_id = qr_detector.map_item_to_box(bbox, frame_idx)
-                if box_id and box_mapper:
-                    box_mapper.add_mapping(track_id or -1, refinedLabel, box_id, timestamp or 0.0)
-                    logger.info(f"[MAPPED] Item '{refinedLabel}' -> Box '{box_id}'")
+            
+            if entry_detector and box_detections:
+                # Check entry for each detected box in this frame
+                for box_idx, box_det in enumerate(box_detections):
+                    box_bbox = box_det['bbox']
+                    box_id_temp = f"BOX-{frame_idx}-{box_idx}"
+                    
+                    confirmed_entry = entry_detector.detect_entry(
+                        track_id=track_id,
+                        item_bbox=bbox,
+                        box_id=box_id_temp,
+                        box_bbox=box_bbox,
+                        frame_number=frame_idx,
+                        overlap_threshold=config.get('entry_detection.overlap_threshold', 0.5)
+                    )
+                    
+                    if confirmed_entry:
+                        entry_detected = True
+                        box_id = box_id_temp
+                        logger.info(f"🎯 [ENTRY DETECTED] Frame {frame_idx}: Track#{track_id} '{yoloLabel}' in {box_id}")
+                        break
+            
+            # Only process items that have entered boxes (or if entry detection is disabled)
+            should_process = not entry_enabled or (entry_detected and track_id not in items_entered_boxes)
+            
+            if should_process:
+                
+                # Skip if already processed
+                if tracker and track_id is not None and track_id in processed_tracks:
+                    continue
 
-            # Log results
-            if refinedLabel:
-                if refinedLabel not in finalItems:
-                    logger.info(f"[NEW ITEM] {timestamp}s Track#{track_id} '{yoloLabel}' -> '{refinedLabel}'")
-                    finalItems.add(refinedLabel)
+                x1, y1, x2, y2 = bbox
+                croppedImage = originalFrame[y1:y2, x1:x2]
+                if croppedImage.size == 0:
+                    logger.warning(f"Skipping empty crop for '{yoloLabel}' in frame {frame_idx}")
+                    continue
+
+                # Save cropped image if enabled
+                if config.get('output.save_cropped_images', True):
+                    crop_filename = annotatedDir / f"frame{frame_idx:05d}_track{track_id}_{yoloLabel}.jpg"
+                    cv2.imwrite(str(crop_filename), croppedImage)
+
+                # Refine with LLaMA
+                refinedLabel = None
+                if reasoner:
+                    refinedLabel = reasoner.refineDetection(croppedImage, yoloLabel)
+                    if track_id is not None:
+                        processed_tracks.add(track_id)
                 else:
-                    logger.debug(f"[CONFIRMED] {timestamp}s Track#{track_id} '{refinedLabel}'")
-            else:
-                logger.debug(f"[DISCARDED] {timestamp}s Rejected '{yoloLabel}'")
+                    refinedLabel = yoloLabel
+                
+                # Fallback to YOLO if LLaMA returns None
+                if refinedLabel is None:
+                    refinedLabel = yoloLabel
+                    logger.debug(f"Using YOLO label '{yoloLabel}' as fallback")
 
-            csv_writer.writerow([frame_idx, f.get('filename'), timestamp, yoloLabel, confidence, refinedLabel, track_id, box_id])
+                # Record the entry
+                if refinedLabel and entry_detected:
+                    items_entered_boxes[track_id] = {
+                        'label': refinedLabel,
+                        'box_id': box_id,
+                        'timestamp': timestamp,
+                        'frame': frame_idx
+                    }
+                    
+                    if box_mapper and box_id:
+                        box_mapper.add_mapping(track_id or -1, refinedLabel, box_id, timestamp or 0.0)
+                        logger.info(f"📦 [PACKED] '{refinedLabel}' → {box_id} at {timestamp}s")
+
+                # Log results
+                if refinedLabel:
+                    if refinedLabel not in finalItems:
+                        logger.info(f"[NEW ITEM] {timestamp}s Track#{track_id} '{yoloLabel}' → '{refinedLabel}'")
+                        finalItems.add(refinedLabel)
+                    else:
+                        logger.debug(f"[CONFIRMED] {timestamp}s Track#{track_id} '{refinedLabel}'")
+
+                csv_writer.writerow([frame_idx, f.get('filename'), timestamp, yoloLabel, 
+                                   confidence, refinedLabel, track_id, box_id, entry_detected])
+            else:
+                # Item tracked but hasn't entered a box yet
+                csv_writer.writerow([frame_idx, f.get('filename'), timestamp, yoloLabel, 
+                                   confidence, None, track_id, None, False])
 
     # ---------------- Generate Annotated Video ---------------- #
     if annotator:
@@ -285,21 +350,54 @@ def main(videoPath=None):
     # ---------------- Export Results ---------------- #
     finalItemsList = sorted(list(finalItems))
     logger.info(f"Found {len(finalItemsList)} unique refined items")
+    logger.info(f"Total box detections across all frames: {detected_boxes_count}")
     
+    # NEW FORMAT: item: "description"
     with open(final_output_file, 'w', encoding='utf-8') as f:
-        for name in finalItemsList:
-            f.write(f"{name}\n")
+        for idx, name in enumerate(finalItemsList, 1):
+            formatted_name = name.title()
+            f.write(f'item {idx}: "{formatted_name}"\n')
     
     logger.info(f"Items saved to {final_output_file}")
 
+    # Export box mappings
     if box_mapper:
         box_mappings = box_mapper.export_to_dict()
         box_mapping_file = PROJECT_ROOT / 'box_mappings.json'
         with open(box_mapping_file, 'w', encoding='utf-8') as f:
             json.dump(box_mappings, f, indent=2)
         logger.info(f"Box mappings saved to {box_mapping_file}")
-        logger.info(f"Total boxes detected: {box_mappings['summary']['total_boxes']}")
+        logger.info(f"Total boxes with items: {box_mappings['summary']['total_boxes']}")
         logger.info(f"Total items mapped: {box_mappings['summary']['total_items']}")
+
+    # Export entry details
+    if entry_detector and items_entered_boxes:
+        entry_log_file = PROJECT_ROOT / 'entry_log.json'
+        entry_data = {
+            'total_entries': len(items_entered_boxes),
+            'entries': [
+                {
+                    'track_id': tid,
+                    'label': info['label'],
+                    'box_id': info['box_id'],
+                    'timestamp': info['timestamp'],
+                    'frame': info['frame']
+                }
+                for tid, info in items_entered_boxes.items()
+            ]
+        }
+        with open(entry_log_file, 'w', encoding='utf-8') as f:
+            json.dump(entry_data, f, indent=2)
+        logger.info(f"Entry log saved to {entry_log_file}")
+        logger.info(f"Total items that entered boxes: {len(items_entered_boxes)}")
+    elif entry_enabled and not items_entered_boxes:
+        logger.warning("Entry detection was enabled but no entries were detected!")
+        logger.warning("This could mean:")
+        logger.warning("  1. No boxes were detected by YOLO")
+        logger.warning("  2. Items didn't overlap boxes enough (try lowering overlap_threshold)")
+        logger.warning("  3. Items didn't stay in boxes long enough (try lowering entry_threshold)")
+        if config.get('entry_detection.require_motion', False):
+            logger.warning("  4. require_motion=True but items were already in boxes (set to False)")
 
     csv_file.close()
     logger.info(f"Detection log saved to {detection_log_file}")

@@ -40,43 +40,82 @@ class FrameReasoner:
     # --------------------------------------------------------------
     def buildPrompt(self) -> str:
         return (
-            "You are an expert object identifier.\n"
-            "You are given a YOLO label: '{yolo_label}'.\n"
-            "You are also given an image crop containing one object.\n\n"
-            "Your task:\n"
-            "- Identify the object in the image.\n"
-            "- If the YOLO guess is correct, return the normalized name.\n"
-            "- If YOLO is incorrect, return the corrected name.\n"
-            "- If the object is unclear, not an item, a person, a cardboard box, "
-            "or something unidentifiable, reply with EXACTLY: None\n\n"
-            "Rules:\n"
-            "- Return ONLY the final object name.\n"
-            "- No extra words, no punctuation, no explanation.\n\n"
-            "Final answer:"
+            "You are an object identifier. Identify the object in this image.\n\n"
+            "YOLO detected: '{yolo_label}'\n\n"
+            "RULES:\n"
+            "1. Return ONLY the object name (1-3 words max)\n"
+            "2. If YOLO is correct, return that exact name\n"
+            "3. If YOLO is wrong, return the correct name\n"
+            "4. NO explanations, NO sentences, NO extra text\n"
+            "5. If unclear or not a packable item, return: none\n\n"
+            "GOOD examples: backpack, laptop, water bottle, book\n"
+            "BAD examples: The object is a backpack, I think this is...\n\n"
+            "Object name (one word or short phrase only):"
         )
 
     # --------------------------------------------------------------
     # Clean and normalize LLaMA output
     # --------------------------------------------------------------
     def parseResponse(self, response_text: str) -> Optional[str]:
-        clean_response = response_text.strip().strip(" -*\"().\n")
-
-        if not clean_response:
+        """Clean and normalize LLaMA output"""
+        if not response_text:
             return None
-
-        if clean_response.lower() == "none":
+        
+        # Convert to lowercase for processing
+        clean = response_text.strip().lower()
+        
+        # Remove common verbose patterns
+        patterns_to_remove = [
+            "the object in the image is a ",
+            "the object in the image is an ",
+            "the object in the image is ",
+            "the object is a ",
+            "the object is an ",
+            "the object is ",
+            "this is a ",
+            "this is an ",
+            "this is ",
+            "i see a ",
+            "i see an ",
+            "answer: ",
+            "final answer: ",
+            "object identification",
+            "correct response is: ",
+            "so the correct response is: ",
+            "object name: ",
+        ]
+        
+        for pattern in patterns_to_remove:
+            clean = clean.replace(pattern, "")
+        
+        # Remove asterisks, quotes, periods
+        clean = clean.strip("*\"'.!? ")
+        
+        # Take only first line (ignore explanations)
+        if '\n' in clean:
+            clean = clean.split('\n')[0].strip()
+        
+        # Take only first sentence (if multiple)
+        if '.' in clean:
+            clean = clean.split('.')[0].strip()
+        
+        # Remove leading/trailing punctuation again
+        clean = clean.strip("*\"'.!?- ")
+        
+        # Check for rejection
+        if not clean or clean == "none" or clean == "unknown":
             return None
-
-        # Optional: normalize synonyms (edit or remove as needed)
-        synonyms = {
-            "tape roll": "packing tape",
-            "tape": "packing tape",
-            "package tape": "packing tape",
-        }
-        if clean_response.lower() in synonyms:
-            clean_response = synonyms[clean_response.lower()]
-
-        return clean_response
+        
+        # Reject if too long (likely an explanation)
+        if len(clean.split()) > 4:
+            return None
+        
+        # Optional: Handle "cardboard box" -> reject it
+        if "cardboard" in clean and "box" in clean:
+            return None
+        
+        # Capitalize properly for output
+        return clean.title()
 
     # --------------------------------------------------------------
     # Main reasoning call
@@ -85,17 +124,14 @@ class FrameReasoner:
 
         if self.client is None:
             print("[ERROR] FrameReasoner not initialized (client unavailable).")
-            return None
+            return yolo_label
 
         try:
-            # Convert numpy image to JPG bytes
             _, buffer = cv2.imencode('.jpg', image_crop)
             image_bytes = buffer.tobytes()
 
-            # Fill prompt
             prompt_text = self.prompt_template.format(yolo_label=yolo_label)
 
-            # Build LLaMA request
             messages = [
                 {
                     "role": "user",
@@ -104,7 +140,6 @@ class FrameReasoner:
                 }
             ]
 
-            # Call Ollama Vision model
             response = self.client.chat(
                 model=self.model_name,
                 messages=messages,
@@ -112,10 +147,20 @@ class FrameReasoner:
             )
 
             raw_response_text = response['message']['content']
-
-            # Parse output
-            return self.parseResponse(raw_response_text)
+            
+            # Debug logging
+            if len(raw_response_text) > 30:
+                print(f"[WARNING] LLaMA verbose response for '{yolo_label}': {raw_response_text[:100]}...")
+            
+            parsed = self.parseResponse(raw_response_text)
+            
+            # Fallback to YOLO if parsing fails
+            if parsed is None:
+                print(f"[INFO] LLaMA rejected '{yolo_label}', using YOLO label")
+                return yolo_label
+                
+            return parsed
 
         except Exception as e:
             print(f"[ERROR] LLaMA refinement failed for '{yolo_label}': {e}")
-            return None
+            return yolo_label
