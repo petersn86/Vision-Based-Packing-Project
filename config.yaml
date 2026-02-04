@@ -4,7 +4,7 @@
 # Video Processing Settings
 video:
   # Time interval (seconds) between extracted frames
-  frame_interval: 2.0
+  frame_interval: 0.5
   
   # Default video path if none provided
   default_video: "data/videos/packing_video.mp4"
@@ -29,8 +29,13 @@ detection:
   # Secondary box detection model (optional)
   box_model: "models/cardboard_boxYOLO.pt"
   
-  # Confidence threshold for detections (0.0 - 1.0)
-  confidence_threshold: 0.35
+  # Confidence threshold for item detections (0.0 - 1.0)
+  confidence_threshold: 0.6
+  
+  # Confidence threshold for box detections (0.0 - 1.0)
+  # Set lower if boxes are hard to detect, higher to reduce false positives
+  # If not specified, uses confidence_threshold
+  box_confidence_threshold: 0.35
   
   # Labels to ignore during detection
   ignore_labels:
@@ -79,11 +84,11 @@ entry_detection:
   entry_threshold: 1
   
   # Number of frames outside before considering item removed
-  exit_threshold: 5
+  exit_threshold: 3
   
   # Minimum overlap percentage (0.0-1.0) to consider item "inside" box
   # 0.2 = 20% overlap, 0.5 = 50% overlap, 0.8 = 80% overlap
-  overlap_threshold: 0.2
+  overlap_threshold: 0.00005
   
   # IMPORTANT: Require motion from outside → inside?
   # - false: Detect items already in boxes (for inventory videos)

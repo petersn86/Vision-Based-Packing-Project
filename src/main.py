@@ -108,8 +108,11 @@ def main(videoPath=None):
     yolo_model = PROJECT_ROOT / config.get('detection.yolo_model', 'models/yolo11l.pt')
     box_model = PROJECT_ROOT / config.get('detection.box_model', 'models/cardboard_boxYOLO.pt')
     conf_threshold = config.get('detection.confidence_threshold', 0.35)
+    box_conf_threshold = config.get('detection.box_confidence_threshold', conf_threshold)
     
     logger.info(f"Initializing YOLO models: {yolo_model}, {box_model}")
+    logger.info(f"Item confidence threshold: {conf_threshold}")
+    logger.info(f"Box confidence threshold: {box_conf_threshold}")
     detector = ObjectDetector(str(yolo_model), str(box_model))
 
     # ---------------- Tracker ---------------- #
@@ -205,7 +208,7 @@ def main(videoPath=None):
         timestamp = meta_map.get(f.get('filename'), None)
 
         # Get all detections
-        detections = detector.detectObjects(originalFrame, confThresh=conf_threshold)
+        detections = detector.detectObjects(originalFrame, confThresh=conf_threshold, boxConfThresh=box_conf_threshold)
 
         # Separate box detections from item detections
         box_detections = []
