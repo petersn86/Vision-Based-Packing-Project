@@ -18,7 +18,7 @@ from ultralytics import YOLO
 import cv2
 
 # Load a pre-trained YOLOv11 model (models are n,s,m,l)
-model = YOLO('yolo11m.pt')
+model = YOLO('yolo26m.pt')
 
 # Open the webcam (0 is the default camera)
 cap = cv2.VideoCapture(0)
