@@ -197,12 +197,17 @@ def main(videoPath=None):
 
     finalItems = set()
     ignoreLabels = set(config.get('detection.ignore_labels', []))
-    processed_tracks = set()
-    items_entered_boxes = {}  # track_id -> {label, box_id, timestamp}
+    items_entered_boxes = {}
     detected_boxes_count = 0
 
     # ---------------- Main Frame Loop ---------------- #
     for f in framesData:
+        originalFrame = f["frame"]
+        frame_idx = f['index']
+        timestamp = meta_map.get(f.get('filename'), None)
+        
+        # RESET processed_tracks for each frame
+        processed_tracks = set()
         originalFrame = f["frame"]
         frame_idx = f['index']
         timestamp = meta_map.get(f.get('filename'), None)

@@ -1,7 +1,0 @@
-item 1: "Backpack"
-item 2: "Book"
-item 3: "Bottle"
-item 4: "Hairdryer"
-item 5: "Handbag"
-item 6: "Scissors"
-item 7: "Shoes"

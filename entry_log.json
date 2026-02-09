@@ -1,9 +1,9 @@
 {
-  "total_entries": 23,
+  "total_entries": 22,
   "entries": [
     {
       "track_id": 0,
-      "label": "Shoes",
+      "label": "Bed",
       "box_id": "BOX-27-0",
       "timestamp": 13.5,
       "frame": 27
@@ -25,138 +25,131 @@
     {
       "track_id": 3,
       "label": "Book",
-      "box_id": "BOX-35-0",
-      "timestamp": 17.5,
-      "frame": 35
-    },
-    {
-      "track_id": 4,
-      "label": "Book",
       "box_id": "BOX-36-0",
       "timestamp": 18.0,
       "frame": 36
     },
     {
-      "track_id": 5,
+      "track_id": 4,
       "label": "Bottle",
       "box_id": "BOX-39-1",
       "timestamp": 19.5,
       "frame": 39
     },
     {
-      "track_id": 6,
+      "track_id": 5,
       "label": "Scissors",
       "box_id": "BOX-47-1",
       "timestamp": 23.5,
       "frame": 47
     },
     {
-      "track_id": 8,
+      "track_id": 7,
       "label": "Scissors",
       "box_id": "BOX-48-1",
       "timestamp": 24.0,
       "frame": 48
     },
     {
-      "track_id": 9,
-      "label": "Hairdryer",
+      "track_id": 8,
+      "label": "Hair Dryer",
       "box_id": "BOX-49-0",
       "timestamp": 24.5,
       "frame": 49
     },
     {
-      "track_id": 13,
+      "track_id": 12,
       "label": "Bottle",
       "box_id": "BOX-52-0",
       "timestamp": 26.0,
       "frame": 52
     },
     {
-      "track_id": 14,
+      "track_id": 13,
       "label": "Bottle",
       "box_id": "BOX-53-0",
       "timestamp": 26.5,
       "frame": 53
     },
     {
-      "track_id": 15,
+      "track_id": 14,
       "label": "Scissors",
       "box_id": "BOX-53-1",
       "timestamp": 26.5,
       "frame": 53
     },
     {
-      "track_id": 19,
+      "track_id": 17,
       "label": "Scissors",
       "box_id": "BOX-56-0",
       "timestamp": 28.0,
       "frame": 56
     },
     {
-      "track_id": 21,
+      "track_id": 19,
       "label": "Scissors",
       "box_id": "BOX-58-1",
       "timestamp": 29.0,
       "frame": 58
     },
     {
-      "track_id": 22,
+      "track_id": 20,
       "label": "Scissors",
       "box_id": "BOX-59-1",
       "timestamp": 29.5,
       "frame": 59
     },
     {
-      "track_id": 23,
+      "track_id": 21,
       "label": "Scissors",
       "box_id": "BOX-60-2",
       "timestamp": 30.0,
       "frame": 60
     },
     {
-      "track_id": 24,
+      "track_id": 22,
       "label": "Backpack",
       "box_id": "BOX-60-0",
       "timestamp": 30.0,
       "frame": 60
     },
     {
-      "track_id": 25,
+      "track_id": 23,
       "label": "Scissors",
       "box_id": "BOX-61-0",
       "timestamp": 30.5,
       "frame": 61
     },
     {
-      "track_id": 27,
+      "track_id": 24,
       "label": "Bottle",
       "box_id": "BOX-63-0",
       "timestamp": 31.5,
       "frame": 63
     },
     {
-      "track_id": 28,
+      "track_id": 25,
       "label": "Scissors",
       "box_id": "BOX-63-0",
       "timestamp": 31.5,
       "frame": 63
     },
     {
-      "track_id": 29,
+      "track_id": 26,
       "label": "Scissors",
       "box_id": "BOX-64-0",
       "timestamp": 32.0,
       "frame": 64
     },
     {
-      "track_id": 30,
+      "track_id": 27,
       "label": "Handbag",
       "box_id": "BOX-64-0",
       "timestamp": 32.0,
       "frame": 64
     },
     {
-      "track_id": 31,
+      "track_id": 28,
       "label": "Scissors",
       "box_id": "BOX-67-0",
       "timestamp": 33.5,

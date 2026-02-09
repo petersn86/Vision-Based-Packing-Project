@@ -62,9 +62,9 @@ tracking:
   
   # ByteTrack parameters
   track_thresh: 0.5         # High-confidence detection threshold
-  track_buffer: 30          # Frames to keep lost tracks alive
-  match_thresh: 0.8         # IOU threshold for first association (high-conf)
-  second_match_thresh: 0.5  # IOU threshold for second association (low-conf recovery)
+  track_buffer: 60          # Frames to keep lost tracks alive
+  match_thresh: 0.7         # IOU threshold for first association (high-conf)
+  second_match_thresh: 0.4  # IOU threshold for second association (low-conf recovery)
 
 # QR Code Detection Settings
 qr_detection:
@@ -84,7 +84,7 @@ entry_detection:
   entry_threshold: 1
   
   # Number of frames outside before considering item removed
-  exit_threshold: 3
+  exit_threshold: 1
   
   # Minimum overlap percentage (0.0-1.0) to consider item "inside" box
   # 0.2 = 20% overlap, 0.5 = 50% overlap, 0.8 = 80% overlap
