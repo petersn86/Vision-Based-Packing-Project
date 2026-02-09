@@ -7,7 +7,8 @@
 # This module performs object detection on video frames using
 # a pretrained YOLOv8 model. Using object orientated design,
 # it returns bounding boxes, labels, and confidence
-# scores for each detected object.
+# scores for each detected object. Supports separate confidence
+# thresholds for primary model and box detection model.
 #
 ##############################################
 
@@ -30,8 +31,23 @@ class ObjectDetector:
             print(f"[INFO] Loading secondary YOLO model (box detector): {boxModelPath}")
             self.box_model = YOLO(boxModelPath)
 
-    # Create Detect Objects Functionality
-    def detectObjects(self, frame: np.ndarray, confThresh: float = 0.35) -> List[Dict]:
+    # Create Detect Objects Functionality with separate thresholds
+    def detectObjects(self, frame: np.ndarray, confThresh: float = 0.35, boxConfThresh: float = None) -> List[Dict]:
+        """
+        Detect objects in frame using primary and optional box models
+        
+        Args:
+            frame: Input frame
+            confThresh: Confidence threshold for primary model
+            boxConfThresh: Confidence threshold for box model (uses confThresh if None)
+            
+        Returns:
+            List of detections with bbox, confidence, label
+        """
+        
+        # Use same threshold for boxes if not specified
+        if boxConfThresh is None:
+            boxConfThresh = confThresh
         
         # Prepare results
         results     = self.model.predict(frame, conf=confThresh, verbose=False)
@@ -47,7 +63,7 @@ class ObjectDetector:
                 conf = float(box.conf[0].cpu().numpy())
                 cls = int(box.cls[0].cpu().numpy())
 
-                # Get the label name from the model’s class names
+                # Get the label name from the model's class names
                 label = self.model.names[cls] if hasattr(self.model, "names") else str(cls)
 
                 # Add the detection info as a dictionary
@@ -57,9 +73,9 @@ class ObjectDetector:
                     "label": label
                 })
 
-        # Run secondary (box) model if available
+        # Run secondary (box) model if available with separate threshold
         if self.box_model:
-            box_results = self.box_model.predict(frame, conf=confThresh, verbose=False)
+            box_results = self.box_model.predict(frame, conf=boxConfThresh, verbose=False)
             for result in box_results:
                 for box in result.boxes:
                     x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().astype(int)

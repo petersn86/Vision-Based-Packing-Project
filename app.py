@@ -32,6 +32,7 @@ app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB max
 Path(UPLOAD_FOLDER).mkdir(exist_ok=True)
 Path('data/frames').mkdir(parents=True, exist_ok=True)
 Path('data/yolo_frames').mkdir(parents=True, exist_ok=True)
+Path('data/videos').mkdir(parents=True, exist_ok=True)
 
 # Processing status storage
 processing_status = {}
@@ -62,18 +63,20 @@ def process_video_async(video_path, job_id):
         
         # Load results
         try:
-            with open('refined_item_list.txt', 'r') as f:
+            with open('refined_item_list.txt', 'r', encoding='utf-8') as f:
                 items = [line.strip() for line in f if line.strip()]
             processing_status[job_id]['items'] = items
             processing_status[job_id]['item_count'] = len(items)
         except:
             processing_status[job_id]['items'] = []
         
-        # Check for output files
+        # Check for output files - FIXED PATHS
         processing_status[job_id]['files'] = {
             'detection_log': os.path.exists('detection_log.csv'),
             'item_list': os.path.exists('refined_item_list.txt'),
-            'annotated_video': os.path.exists('data/output_annotated.mp4')
+            'annotated_video': os.path.exists('data/videos/output_annotated.mp4'),  # FIXED
+            'entry_log': os.path.exists('entry_log.json'),
+            'box_mappings': os.path.exists('box_mappings.json')
         }
         
     except Exception as e:
@@ -166,11 +169,27 @@ def get_results(job_id):
     if os.path.exists('detection_log.csv'):
         import csv
         detections = []
-        with open('detection_log.csv', 'r') as f:
+        with open('detection_log.csv', 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
                 detections.append(row)
         results['detections'] = detections[:100]  # Limit to first 100
+    
+    # Load entry log if available
+    if os.path.exists('entry_log.json'):
+        try:
+            with open('entry_log.json', 'r', encoding='utf-8') as f:
+                results['entry_log'] = json.load(f)
+        except:
+            pass
+    
+    # Load box mappings if available
+    if os.path.exists('box_mappings.json'):
+        try:
+            with open('box_mappings.json', 'r', encoding='utf-8') as f:
+                results['box_mappings'] = json.load(f)
+        except:
+            pass
     
     return jsonify(results)
 
@@ -178,10 +197,13 @@ def get_results(job_id):
 @app.route('/download/<file_type>')
 def download_file(file_type):
     """Download result files"""
+    # FIXED: Updated video path
     files = {
         'items': 'refined_item_list.txt',
         'log': 'detection_log.csv',
-        'video': 'data/output_annotated.mp4'
+        'video': 'data/videos/output_annotated.mp4',  # FIXED PATH
+        'entry_log': 'entry_log.json',
+        'box_mappings': 'box_mappings.json'
     }
     
     if file_type not in files:
@@ -190,7 +212,7 @@ def download_file(file_type):
     filepath = files[file_type]
     
     if not os.path.exists(filepath):
-        return jsonify({'error': 'File not found'}), 404
+        return jsonify({'error': f'File not found: {filepath}'}), 404
     
     return send_file(filepath, as_attachment=True)
 

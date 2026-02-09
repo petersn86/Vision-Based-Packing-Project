@@ -4,7 +4,7 @@
 # Video Processing Settings
 video:
   # Time interval (seconds) between extracted frames
-  frame_interval: 2.0
+  frame_interval: 0.5
   
   # Default video path if none provided
   default_video: "data/videos/packing_video.mp4"
@@ -19,7 +19,7 @@ paths:
   # Output files
   refined_items_file: "refined_item_list.txt"
   detection_log_file: "detection_log.csv"
-  annotated_video_file: "data/output_annotated.mp4"
+  annotated_video_file: "data/videos/output_annotated.mp4"
 
 # YOLO Detection Settings
 detection:
@@ -29,15 +29,19 @@ detection:
   # Secondary box detection model (optional)
   box_model: "models/cardboard_boxYOLO.pt"
   
-  # Confidence threshold for detections (0.0 - 1.0)
-  confidence_threshold: 0.35
+  # Confidence threshold for item detections (0.0 - 1.0)
+  confidence_threshold: 0.6
+  
+  # Confidence threshold for box detections (0.0 - 1.0)
+  # Set lower if boxes are hard to detect, higher to reduce false positives
+  # If not specified, uses confidence_threshold
+  box_confidence_threshold: 0.35
   
   # Labels to ignore during detection
   ignore_labels:
     - "person"
     - "people"
-    - "cardboard"
-    - "box"
+    # Don't ignore "box" or "cardboard" - we need those for entry detection!
 
 # LLaMA Vision Settings
 llama:
@@ -51,30 +55,45 @@ llama:
   max_retries: 3
   retry_delay: 1.0
 
-# Object Tracking Settings (ByteTrack - Quick Win #2)
+# Object Tracking Settings (ByteTrack)
 tracking:
   # Enable object tracking
   enabled: true
   
-  # ByteTrack parameters (preferred - better for occlusions)
+  # ByteTrack parameters
   track_thresh: 0.5         # High-confidence detection threshold
-  track_buffer: 30          # Frames to keep lost tracks alive
-  match_thresh: 0.8         # IOU threshold for first association (high-conf)
-  second_match_thresh: 0.5  # IOU threshold for second association (low-conf recovery)
-  
-  # Legacy SORT parameters (for backwards compatibility)
-  # If track_thresh is not set, these will be used instead:
-  # max_age: 30
-  # min_hits: 3
-  # iou_threshold: 0.3
+  track_buffer: 60          # Frames to keep lost tracks alive
+  match_thresh: 0.7         # IOU threshold for first association (high-conf)
+  second_match_thresh: 0.4  # IOU threshold for second association (low-conf recovery)
 
-# QR Code Detection Settings (for Quick Win #4)
+# QR Code Detection Settings
 qr_detection:
-  # Enable QR code detection
-  enabled: true
+  # Enable QR code detection (currently not used - using YOLO boxes instead)
+  enabled: false
   
   # Proximity threshold (pixels) for item-to-box mapping
   proximity_threshold: 100
+
+# Entry Detection Settings (Track items in boxes)
+entry_detection:
+  # Enable entry detection (only track items inside boxes)
+  enabled: true
+  
+  # Number of consecutive frames inside box to confirm entry
+  # Lower = more sensitive (1-2 for fast-moving items, 3-5 for careful verification)
+  entry_threshold: 1
+  
+  # Number of frames outside before considering item removed
+  exit_threshold: 1
+  
+  # Minimum overlap percentage (0.0-1.0) to consider item "inside" box
+  # 0.2 = 20% overlap, 0.5 = 50% overlap, 0.8 = 80% overlap
+  overlap_threshold: 0.00005
+  
+  # IMPORTANT: Require motion from outside → inside?
+  # - false: Detect items already in boxes (for inventory videos)
+  # - true: Only detect items actively being placed (for packing process videos)
+  require_motion: false
 
 # Output Settings
 output:
@@ -86,6 +105,9 @@ output:
   
   # Video frame rate
   video_fps: 10
+  
+  # Save individual cropped item images
+  save_cropped_images: true
   
   # Save individual annotated frames
   save_annotated_frames: true

@@ -36,3 +36,4 @@ env/
 # Extraneous
 detection_log.csv
 box_contents.json
+entry_log.json
