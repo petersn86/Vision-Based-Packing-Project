@@ -44,7 +44,7 @@ detection:
   # Confidence threshold for item detections (0.0 - 1.0)
   # Lower = more detections but more false positives
   # Recommended: 0.25-0.35 for cluttered scenes, 0.5+ for clean scenes
-  confidence_threshold: 0.6
+  confidence_threshold: 0.70
   
   # Confidence threshold for box detections (0.0 - 1.0)
   # Set lower if boxes are hard to detect, higher to reduce false positives
@@ -107,7 +107,7 @@ entry_detection:
   
   # Minimum overlap percentage (0.0-1.0) to consider item "inside" box
   # 0.2 = 20% overlap, 0.5 = 50% overlap, 0.8 = 80% overlap
-  overlap_threshold: 0.00005
+  overlap_threshold: 0.20
   
   # IMPORTANT: Require motion from outside → inside?
   # - false: Detect items already in boxes (for inventory videos)
