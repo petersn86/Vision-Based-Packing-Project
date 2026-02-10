@@ -64,6 +64,26 @@ def setup_logging(config):
     
     return logging.getLogger(__name__)
 
+
+# ------------------ Helper Function ------------------ #
+def is_box_label(label: str, box_labels: list) -> bool:
+    """
+    Check if a label corresponds to a box/container detection.
+    
+    Args:
+        label: The detection label to check
+        box_labels: List of labels that should be treated as boxes
+        
+    Returns:
+        True if the label is a box label, False otherwise
+    """
+    label_lower = label.lower()
+    for box_label in box_labels:
+        if box_label.lower() in label_lower:
+            return True
+    return False
+
+
 # ------------------ Main Pipeline ----------------- #
 def main(videoPath=None):
     start_time = datetime.now()
@@ -105,42 +125,47 @@ def main(videoPath=None):
         logger.warning(f"Could not build timestamp mapping: {e}")
 
     # ---------------- Object Detector ---------------- #
-    yolo_model = PROJECT_ROOT / config.get('detection.yolo_model', 'models/yolo11l.pt')
+    yolo_model = PROJECT_ROOT / config.get('detection.yolo_model', 'models/yolo26m.pt')
     box_model = PROJECT_ROOT / config.get('detection.box_model', 'models/cardboard_boxYOLO.pt')
     conf_threshold = config.get('detection.confidence_threshold', 0.35)
     box_conf_threshold = config.get('detection.box_confidence_threshold', conf_threshold)
     
+    # Get configurable box labels
+    box_labels = config.get('detection.box_labels', ['box', 'carton', 'cardboard'])
+    
     logger.info(f"Initializing YOLO models: {yolo_model}, {box_model}")
     logger.info(f"Item confidence threshold: {conf_threshold}")
     logger.info(f"Box confidence threshold: {box_conf_threshold}")
+    logger.info(f"Box labels to recognize: {box_labels}")
     detector = ObjectDetector(str(yolo_model), str(box_model))
 
     # ---------------- Tracker ---------------- #
     tracking_enabled = config.get('tracking.enabled', True)
     tracker = None
     if tracking_enabled:
-        track_thresh = config.get('tracking.track_thresh')
-        track_buffer = config.get('tracking.track_buffer')
-        match_thresh = config.get('tracking.match_thresh')
-        second_match_thresh = config.get('tracking.second_match_thresh')
+        track_thresh = config.get('tracking.track_thresh', 0.5)
+        track_buffer = config.get('tracking.track_buffer', 60)
+        match_thresh = config.get('tracking.match_thresh', 0.7)
+        second_match_thresh = config.get('tracking.second_match_thresh', 0.4)
         
-        if track_thresh is not None:
-            logger.info(f"Object tracking enabled (ByteTrack mode)")
-            tracker = ObjectTracker(
-                track_thresh=track_thresh or 0.5,
-                track_buffer=track_buffer or 30,
-                match_thresh=match_thresh or 0.8,
-                second_match_thresh=second_match_thresh or 0.5
-            )
-        else:
-            max_age = config.get('tracking.max_age', 30)
-            logger.info(f"Object tracking enabled (SORT compatibility mode)")
-            tracker = ObjectTracker(
-                track_thresh=0.5,
-                track_buffer=max_age,
-                match_thresh=0.8,
-                second_match_thresh=0.5
-            )
+        # Re-ID settings
+        reid_enabled = config.get('tracking.reid_enabled', True)
+        reid_thresh = config.get('tracking.reid_thresh', 0.5)
+        reid_buffer = config.get('tracking.reid_buffer', 150)
+        
+        logger.info(f"Object tracking enabled (ByteTrack with Re-ID)")
+        logger.info(f"  track_buffer={track_buffer}, reid_buffer={reid_buffer}")
+        logger.info(f"  Re-ID: {'ENABLED' if reid_enabled else 'DISABLED'} (thresh={reid_thresh})")
+        
+        tracker = ObjectTracker(
+            track_thresh=track_thresh,
+            track_buffer=track_buffer,
+            match_thresh=match_thresh,
+            second_match_thresh=second_match_thresh,
+            reid_enabled=reid_enabled,
+            reid_thresh=reid_thresh,
+            reid_buffer=reid_buffer
+        )
     else:
         logger.info("Object tracking disabled")
 
@@ -215,16 +240,16 @@ def main(videoPath=None):
         # Get all detections
         detections = detector.detectObjects(originalFrame, confThresh=conf_threshold, boxConfThresh=box_conf_threshold)
 
-        # Separate box detections from item detections
+        # Separate box detections from item detections using configurable box_labels
         box_detections = []
         item_detections = []
         
         for det in detections:
             label_lower = det['label'].lower()
-            # Check if it's a box/cardboard detection
-            if 'box' in label_lower or 'cardboard' in label_lower:
+            # Check if it's a box/carton/cardboard detection using configurable labels
+            if is_box_label(det['label'], box_labels):
                 box_detections.append(det)
-                logger.debug(f"Frame {frame_idx}: Detected box at {det['bbox']}")
+                logger.debug(f"Frame {frame_idx}: Detected box ({det['label']}) at {det['bbox']}")
             elif label_lower not in ignoreLabels:
                 item_detections.append(det)
         
@@ -235,7 +260,8 @@ def main(videoPath=None):
         # Object Tracking (only track items, not boxes)
         tracked_objects = []
         if tracker:
-            tracked_objects = tracker.update(item_detections)
+            # Pass frame for re-ID feature extraction
+            tracked_objects = tracker.update(item_detections, frame=originalFrame)
             logger.debug(f"Frame {frame_idx}: {len(tracked_objects)} tracked items, {len(box_detections)} boxes")
         else:
             tracked_objects = [{**det, 'track_id': None} for det in item_detections]

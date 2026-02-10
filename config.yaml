@@ -24,13 +24,27 @@ paths:
 # YOLO Detection Settings
 detection:
   # Primary YOLO model path
+  # Options: yolo26n.pt, yolo26s.pt, yolo26m.pt, yolo26l.pt, yolo26x.pt
+  #          yolo11n.pt, yolo11s.pt, yolo11m.pt, yolo11l.pt, yolo11x.pt
   yolo_model: "models/yolo11l.pt"
   
   # Secondary box detection model (optional)
-  box_model: "models/cardboard_boxYOLO.pt"
+  # Options:
+  #   - "models/cardboard_boxYOLO.pt"   (labels boxes as "box")
+  #   - "models/cardboard_YOLO25.pt"    (labels boxes as "carton")
+  box_model: "models/cardboard_YOLO25.pt"
+  
+  # Labels that should be recognized as boxes/containers
+  # Add any labels your box model uses (e.g., "box", "carton", "cardboard")
+  box_labels:
+    - "box"
+    - "carton"
+    - "cardboard"
   
   # Confidence threshold for item detections (0.0 - 1.0)
-  confidence_threshold: 0.6
+  # Lower = more detections but more false positives
+  # Recommended: 0.25-0.35 for cluttered scenes, 0.5+ for clean scenes
+  confidence_threshold: 0.70
   
   # Confidence threshold for box detections (0.0 - 1.0)
   # Set lower if boxes are hard to detect, higher to reduce false positives
@@ -41,7 +55,6 @@ detection:
   ignore_labels:
     - "person"
     - "people"
-    # Don't ignore "box" or "cardboard" - we need those for entry detection!
 
 # LLaMA Vision Settings
 llama:
@@ -55,16 +68,22 @@ llama:
   max_retries: 3
   retry_delay: 1.0
 
-# Object Tracking Settings (ByteTrack)
+# Object Tracking Settings (ByteTrack with Re-ID)
 tracking:
   # Enable object tracking
   enabled: true
   
   # ByteTrack parameters
   track_thresh: 0.5         # High-confidence detection threshold
-  track_buffer: 60          # Frames to keep lost tracks alive
+  track_buffer: 60          # Frames to keep lost tracks alive for IOU matching
   match_thresh: 0.7         # IOU threshold for first association (high-conf)
   second_match_thresh: 0.4  # IOU threshold for second association (low-conf recovery)
+  
+  # Re-Identification Settings (NEW)
+  # Allows objects to regain their track ID after disappearing
+  reid_enabled: true        # Enable appearance-based re-identification
+  reid_thresh: 0.3          # Minimum similarity to re-identify (0.0-1.0, lower = more matches)
+  reid_buffer: 150          # Frames to keep tracks in re-ID gallery (can be longer than track_buffer)
 
 # QR Code Detection Settings
 qr_detection:
@@ -88,7 +107,7 @@ entry_detection:
   
   # Minimum overlap percentage (0.0-1.0) to consider item "inside" box
   # 0.2 = 20% overlap, 0.5 = 50% overlap, 0.8 = 80% overlap
-  overlap_threshold: 0.00005
+  overlap_threshold: 0.20
   
   # IMPORTANT: Require motion from outside → inside?
   # - false: Detect items already in boxes (for inventory videos)
