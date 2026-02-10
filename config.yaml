@@ -3,155 +3,125 @@
 
 # Video Processing Settings
 video:
-  # Time interval (seconds) between extracted frames
   frame_interval: 0.5
-  
-  # Default video path if none provided
   default_video: "data/videos/packing_video.mp4"
 
 # Directory Paths
 paths:
-  # Input/Output directories
   frames_dir: "data/frames"
   annotated_dir: "data/yolo_frames"
   videos_dir: "data/videos"
-  
-  # Output files
   refined_items_file: "refined_item_list.txt"
   detection_log_file: "detection_log.csv"
   annotated_video_file: "data/videos/output_annotated.mp4"
 
 # YOLO Detection Settings
 detection:
-  # Primary YOLO model path
-  # Options: yolo26n.pt, yolo26s.pt, yolo26m.pt, yolo26l.pt, yolo26x.pt
-  #          yolo11n.pt, yolo11s.pt, yolo11m.pt, yolo11l.pt, yolo11x.pt
   yolo_model: "models/yolo11l.pt"
-  
-  # Secondary box detection model (optional)
-  # Options:
-  #   - "models/cardboard_boxYOLO.pt"   (labels boxes as "box")
-  #   - "models/cardboard_YOLO25.pt"    (labels boxes as "carton")
   box_model: "models/cardboard_YOLO25.pt"
-  
-  # Labels that should be recognized as boxes/containers
-  # Add any labels your box model uses (e.g., "box", "carton", "cardboard")
   box_labels:
     - "box"
     - "carton"
     - "cardboard"
-  
-  # Confidence threshold for item detections (0.0 - 1.0)
-  # Lower = more detections but more false positives
-  # Recommended: 0.25-0.35 for cluttered scenes, 0.5+ for clean scenes
-  confidence_threshold: 0.70
-  
-  # Confidence threshold for box detections (0.0 - 1.0)
-  # Set lower if boxes are hard to detect, higher to reduce false positives
-  # If not specified, uses confidence_threshold
+  confidence_threshold: 0.60
   box_confidence_threshold: 0.35
-  
-  # Labels to ignore during detection
   ignore_labels:
     - "person"
     - "people"
 
+# Plausibility Filter
+# Discards detections whose label implies a large object but whose bbox
+# is too small relative to the frame to plausibly be that object.
+plausibility_filter:
+  enabled: true
+  thresholds: {}
+  # Examples:
+  #   microwave: 0.30
+  #   refrigerator: 0.70
+
 # LLaMA Vision Settings
 llama:
-  # Ollama model name
   model_name: "llama3.2-vision"
-  
-  # Enable/disable LLaMA refinement
   enabled: true
-  
-  # Retry settings for failed API calls
   max_retries: 3
   retry_delay: 1.0
 
-# Object Tracking Settings (ByteTrack with Re-ID)
+# Object Tracking Settings (ByteTrack + MobileNetV2 re-ID)
 tracking:
-  # Enable object tracking
   enabled: true
-  
-  # ByteTrack parameters
-  track_thresh: 0.5         # High-confidence detection threshold
-  track_buffer: 60          # Frames to keep lost tracks alive for IOU matching
-  match_thresh: 0.7         # IOU threshold for first association (high-conf)
-  second_match_thresh: 0.4  # IOU threshold for second association (low-conf recovery)
-  
-  # Re-Identification Settings (NEW)
-  # Allows objects to regain their track ID after disappearing
-  reid_enabled: true        # Enable appearance-based re-identification
-  reid_thresh: 0.3          # Minimum similarity to re-identify (0.0-1.0, lower = more matches)
-  reid_buffer: 150          # Frames to keep tracks in re-ID gallery (can be longer than track_buffer)
+  track_thresh: 0.5
+  track_buffer: 60
+  match_thresh: 0.7
+  second_match_thresh: 0.4
+  reid_enabled: true
+  # reid_thresh: cosine similarity threshold for re-identifying a lost object.
+  # 0.50 works well with MobileNetV2 embeddings for held/moving items.
+  # Raise toward 0.70 if different objects are being incorrectly merged.
+  # Lower toward 0.35 if the same object keeps getting new IDs.
+  reid_thresh: 0.50
+  reid_buffer: 150
 
-# QR Code Detection Settings
+# Box Tracker
+# Assigns stable IDs to detected boxes across frames so that
+# ItemRegistry can correctly deduplicate items by (label + box_id).
+# Without this, box_id changes every frame and every detection looks
+# like a new item to the registry.
+box_tracker:
+  # Minimum IOU between two box detections to consider them the same
+  # physical box. 0.3 is permissive enough to handle slight camera shake.
+  iou_threshold: 0.3
+  # Frames a box can go undetected before its ID is retired.
+  # At 0.5s interval: 30 frames = 15 seconds.
+  max_age: 30
+
+# Item Registry
+# Deduplicates items by (label + box_id + recency) rather than track ID.
+# This means a Dial bottle that gets 6 different track IDs still only
+# appears once in the final item list.
+item_registry:
+  # Number of frames within which a re-detection of the same label+box
+  # is considered the same physical item rather than a new one.
+  # At 0.5s frame interval:  60 frames = 30 seconds
+  # At 1.0s frame interval:  60 frames = 60 seconds
+  # Increase if items are out of frame for long stretches.
+  # Decrease if genuinely different items of the same type are packed
+  # in rapid succession and being incorrectly merged.
+  # At 0.5s frame interval: 10 frames = 5 seconds.
+  # Keeps legitimate re-detections of the same object merged while
+  # ensuring a different object with the same YOLO label (e.g. screwdriver
+  # also labeled "bottle") gets its own instance after a few seconds gap.
+  same_item_window: 10
+
+# QR Code Detection
 qr_detection:
-  # Enable QR code detection (currently not used - using YOLO boxes instead)
   enabled: false
-  
-  # Proximity threshold (pixels) for item-to-box mapping
   proximity_threshold: 100
 
-# Entry Detection Settings (Track items in boxes)
+# Entry Detection
 entry_detection:
-  # Enable entry detection (only track items inside boxes)
   enabled: true
-  
-  # Number of consecutive frames inside box to confirm entry
-  # Lower = more sensitive (1-2 for fast-moving items, 3-5 for careful verification)
   entry_threshold: 1
-  
-  # Number of frames outside before considering item removed
   exit_threshold: 1
-  
-  # Minimum overlap percentage (0.0-1.0) to consider item "inside" box
-  # 0.2 = 20% overlap, 0.5 = 50% overlap, 0.8 = 80% overlap
   overlap_threshold: 0.20
-  
-  # IMPORTANT: Require motion from outside → inside?
-  # - false: Detect items already in boxes (for inventory videos)
-  # - true: Only detect items actively being placed (for packing process videos)
   require_motion: false
 
 # Output Settings
 output:
-  # Generate annotated video
   create_video: true
-  
-  # Video codec for output (mp4v, x264, etc.)
   video_codec: "mp4v"
-  
-  # Video frame rate
   video_fps: 10
-  
-  # Save individual cropped item images
   save_cropped_images: true
-  
-  # Save individual annotated frames
   save_annotated_frames: true
-  
-  # Export format for results (csv, json, both)
   export_format: "both"
 
-# Logging Settings
+# Logging
 logging:
-  # Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
   level: "INFO"
-  
-  # Log file path
   log_file: "app.log"
-  
-  # Console output
   console_output: true
 
-# Performance Settings
+# Performance
 performance:
-  # Use GPU if available
   use_gpu: true
-  
-  # Batch size for YOLO processing
   batch_size: 1
-  
-  # Number of worker threads
   num_workers: 4

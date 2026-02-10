@@ -1,0 +1,294 @@
+{
+  "items": [
+    {
+      "instance_id": 2,
+      "label": "Book",
+      "raw_label": "book",
+      "box_id": "BOX-001",
+      "track_ids": [
+        1,
+        2
+      ],
+      "first_frame": 5,
+      "last_frame": 6,
+      "first_ts": 2.361,
+      "last_ts": 2.834,
+      "status": "in_box",
+      "exit_frame": null,
+      "exit_ts": null
+    },
+    {
+      "instance_id": 4,
+      "label": "Bottle",
+      "raw_label": "bottle",
+      "box_id": "BOX-001",
+      "track_ids": [
+        4,
+        5,
+        6,
+        8,
+        10,
+        12,
+        20,
+        22,
+        24,
+        30,
+        32
+      ],
+      "first_frame": 12,
+      "last_frame": 46,
+      "first_ts": 5.667,
+      "last_ts": 21.724,
+      "status": "in_box",
+      "exit_frame": null,
+      "exit_ts": null
+    },
+    {
+      "instance_id": 5,
+      "label": "Toilet Paper",
+      "raw_label": "refrigerator",
+      "box_id": "BOX-001",
+      "track_ids": [
+        7,
+        9,
+        11,
+        13,
+        19
+      ],
+      "first_frame": 15,
+      "last_frame": 27,
+      "first_ts": 7.084,
+      "last_ts": 12.751,
+      "status": "in_box",
+      "exit_frame": null,
+      "exit_ts": null
+    },
+    {
+      "instance_id": 6,
+      "label": "Cell Phone",
+      "raw_label": "cell phone",
+      "box_id": "BOX-001",
+      "track_ids": [
+        14,
+        15,
+        17,
+        18
+      ],
+      "first_frame": 23,
+      "last_frame": 26,
+      "first_ts": 10.862,
+      "last_ts": 12.279,
+      "status": "in_box",
+      "exit_frame": null,
+      "exit_ts": null
+    },
+    {
+      "instance_id": 7,
+      "label": "Calculator",
+      "raw_label": "remote",
+      "box_id": "BOX-001",
+      "track_ids": [
+        16
+      ],
+      "first_frame": 24,
+      "last_frame": 24,
+      "first_ts": 11.335,
+      "last_ts": 11.335,
+      "status": "in_box",
+      "exit_frame": null,
+      "exit_ts": null
+    },
+    {
+      "instance_id": 8,
+      "label": "Remote Control",
+      "raw_label": "microwave",
+      "box_id": "BOX-001",
+      "track_ids": [
+        21
+      ],
+      "first_frame": 30,
+      "last_frame": 30,
+      "first_ts": 14.168,
+      "last_ts": 14.168,
+      "status": "in_box",
+      "exit_frame": null,
+      "exit_ts": null
+    },
+    {
+      "instance_id": 9,
+      "label": "Apple",
+      "raw_label": "apple",
+      "box_id": "BOX-001",
+      "track_ids": [
+        23,
+        25,
+        26,
+        27,
+        28,
+        29,
+        31
+      ],
+      "first_frame": 34,
+      "last_frame": 43,
+      "first_ts": 16.057,
+      "last_ts": 20.308,
+      "status": "in_box",
+      "exit_frame": null,
+      "exit_ts": null
+    }
+  ],
+  "by_box": {
+    "BOX-001": [
+      {
+        "instance_id": 2,
+        "label": "Book",
+        "raw_label": "book",
+        "box_id": "BOX-001",
+        "track_ids": [
+          1,
+          2
+        ],
+        "first_frame": 5,
+        "last_frame": 6,
+        "first_ts": 2.361,
+        "last_ts": 2.834,
+        "status": "in_box",
+        "exit_frame": null,
+        "exit_ts": null
+      },
+      {
+        "instance_id": 4,
+        "label": "Bottle",
+        "raw_label": "bottle",
+        "box_id": "BOX-001",
+        "track_ids": [
+          4,
+          5,
+          6,
+          8,
+          10,
+          12,
+          20,
+          22,
+          24,
+          30,
+          32
+        ],
+        "first_frame": 12,
+        "last_frame": 46,
+        "first_ts": 5.667,
+        "last_ts": 21.724,
+        "status": "in_box",
+        "exit_frame": null,
+        "exit_ts": null
+      },
+      {
+        "instance_id": 5,
+        "label": "Toilet Paper",
+        "raw_label": "refrigerator",
+        "box_id": "BOX-001",
+        "track_ids": [
+          7,
+          9,
+          11,
+          13,
+          19
+        ],
+        "first_frame": 15,
+        "last_frame": 27,
+        "first_ts": 7.084,
+        "last_ts": 12.751,
+        "status": "in_box",
+        "exit_frame": null,
+        "exit_ts": null
+      },
+      {
+        "instance_id": 6,
+        "label": "Cell Phone",
+        "raw_label": "cell phone",
+        "box_id": "BOX-001",
+        "track_ids": [
+          14,
+          15,
+          17,
+          18
+        ],
+        "first_frame": 23,
+        "last_frame": 26,
+        "first_ts": 10.862,
+        "last_ts": 12.279,
+        "status": "in_box",
+        "exit_frame": null,
+        "exit_ts": null
+      },
+      {
+        "instance_id": 7,
+        "label": "Calculator",
+        "raw_label": "remote",
+        "box_id": "BOX-001",
+        "track_ids": [
+          16
+        ],
+        "first_frame": 24,
+        "last_frame": 24,
+        "first_ts": 11.335,
+        "last_ts": 11.335,
+        "status": "in_box",
+        "exit_frame": null,
+        "exit_ts": null
+      },
+      {
+        "instance_id": 8,
+        "label": "Remote Control",
+        "raw_label": "microwave",
+        "box_id": "BOX-001",
+        "track_ids": [
+          21
+        ],
+        "first_frame": 30,
+        "last_frame": 30,
+        "first_ts": 14.168,
+        "last_ts": 14.168,
+        "status": "in_box",
+        "exit_frame": null,
+        "exit_ts": null
+      },
+      {
+        "instance_id": 9,
+        "label": "Apple",
+        "raw_label": "apple",
+        "box_id": "BOX-001",
+        "track_ids": [
+          23,
+          25,
+          26,
+          27,
+          28,
+          29,
+          31
+        ],
+        "first_frame": 34,
+        "last_frame": 43,
+        "first_ts": 16.057,
+        "last_ts": 20.308,
+        "status": "in_box",
+        "exit_frame": null,
+        "exit_ts": null
+      }
+    ]
+  },
+  "summary": {
+    "total_unique_items": 7,
+    "items_in_box": 7,
+    "items_removed": 0,
+    "unique_labels": [
+      "Apple",
+      "Book",
+      "Bottle",
+      "Calculator",
+      "Cell Phone",
+      "Remote Control",
+      "Toilet Paper"
+    ]
+  }
+}

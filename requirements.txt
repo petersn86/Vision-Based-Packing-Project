@@ -6,7 +6,6 @@ tqdm
 numpy
 ultralytics
 ollama
-pathlib
 
 # Configuration management
 pyyaml
@@ -14,6 +13,12 @@ pyyaml
 # Object tracking
 filterpy
 scipy
+
+# Deep visual re-identification (MobileNetV2 feature extractor)
+# If torch/torchvision are unavailable, the tracker falls back
+# to an enhanced multi-channel histogram automatically.
+torch
+torchvision
 
 # QR code detection
 pyzbar

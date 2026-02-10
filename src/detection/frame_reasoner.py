@@ -15,6 +15,13 @@ import numpy as np
 import cv2
 from typing import Optional
 
+# Labels that indicate a box/container — LLaMA should never return these
+BOX_LIKE_LABELS = {
+    "box", "boxes", "cardboard", "cardboard box", "carton", "cartons",
+    "container", "containers", "crate", "crates", "bin", "bins",
+    "package", "packages", "packaging"
+}
+
 class FrameReasoner:
 
     def __init__(self, model_name: str = "llama3.2-vision"):
@@ -52,6 +59,21 @@ class FrameReasoner:
             "BAD examples: The object is a backpack, I think this is...\n\n"
             "Object name (one word or short phrase only):"
         )
+
+    # --------------------------------------------------------------
+    # Check if a label refers to a box/container
+    # --------------------------------------------------------------
+    def _is_box_label(self, label: str) -> bool:
+        """Return True if the label is a box or container type that should be ignored."""
+        clean = label.strip().lower()
+        # Exact match against known box labels
+        if clean in BOX_LIKE_LABELS:
+            return True
+        # Substring check — catches things like "brown cardboard box"
+        for box_word in ("box", "carton", "cardboard", "container", "crate", "bin"):
+            if box_word in clean:
+                return True
+        return False
 
     # --------------------------------------------------------------
     # Clean and normalize LLaMA output
@@ -109,11 +131,11 @@ class FrameReasoner:
         # Reject if too long (likely an explanation)
         if len(clean.split()) > 4:
             return None
-        
-        # Optional: Handle "cardboard box" -> reject it
-        if "cardboard" in clean and "box" in clean:
+
+        # Reject if LLaMA returned a box/container label
+        if self._is_box_label(clean):
             return None
-        
+
         # Capitalize properly for output
         return clean.title()
 
@@ -153,8 +175,13 @@ class FrameReasoner:
                 print(f"[WARNING] LLaMA verbose response for '{yolo_label}': {raw_response_text[:100]}...")
             
             parsed = self.parseResponse(raw_response_text)
+
+            # Reject if refined label is a box type
+            if parsed is not None and self._is_box_label(parsed):
+                print(f"[INFO] LLaMA returned box-like label '{parsed}' for '{yolo_label}', using YOLO label")
+                parsed = None
             
-            # Fallback to YOLO if parsing fails
+            # Fallback to YOLO if parsing fails or box label returned
             if parsed is None:
                 print(f"[INFO] LLaMA rejected '{yolo_label}', using YOLO label")
                 return yolo_label

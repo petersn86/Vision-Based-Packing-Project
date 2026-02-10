@@ -43,12 +43,38 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def run_cleanup():
+    """
+    Run cleanup.py to delete extracted frames before starting a new job.
+    Keeps .gitkeep placeholder files intact.
+    """
+    try:
+        import sys
+        # Import cleanup from project root
+        import importlib.util
+        cleanup_path = Path(__file__).parent / 'cleanup.py'
+        spec = importlib.util.spec_from_file_location("cleanup", cleanup_path)
+        cleanup_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cleanup_mod)
+
+        cleanup_mod.cleanup_frames("data/frames")
+        cleanup_mod.cleanup_frames("data/yolo_frames")
+        print("[INFO] Cleanup complete before new job.")
+    except Exception as e:
+        print(f"[WARNING] Cleanup failed (non-fatal): {e}")
+
+
 def process_video_async(video_path, job_id):
     """Process video in background thread"""
     try:
         processing_status[job_id]['status'] = 'processing'
+        processing_status[job_id]['message'] = 'Cleaning up previous run...'
+
+        # Run cleanup before starting so stale frames don't affect the new job
+        run_cleanup()
+
         processing_status[job_id]['message'] = 'Extracting frames...'
-        
+
         # Import main processing function
         import sys
         sys.path.insert(0, 'src')
@@ -70,11 +96,11 @@ def process_video_async(video_path, job_id):
         except:
             processing_status[job_id]['items'] = []
         
-        # Check for output files - FIXED PATHS
+        # Check for output files
         processing_status[job_id]['files'] = {
             'detection_log': os.path.exists('detection_log.csv'),
             'item_list': os.path.exists('refined_item_list.txt'),
-            'annotated_video': os.path.exists('data/videos/output_annotated.mp4'),  # FIXED
+            'annotated_video': os.path.exists('data/videos/output_annotated.mp4'),
             'entry_log': os.path.exists('entry_log.json'),
             'box_mappings': os.path.exists('box_mappings.json')
         }
@@ -125,7 +151,7 @@ def upload_file():
         'filepath': filepath
     }
     
-    # Start processing in background
+    # Start processing in background (cleanup runs as first step inside)
     thread = threading.Thread(
         target=process_video_async,
         args=(filepath, job_id)
@@ -197,11 +223,10 @@ def get_results(job_id):
 @app.route('/download/<file_type>')
 def download_file(file_type):
     """Download result files"""
-    # FIXED: Updated video path
     files = {
         'items': 'refined_item_list.txt',
         'log': 'detection_log.csv',
-        'video': 'data/videos/output_annotated.mp4',  # FIXED PATH
+        'video': 'data/videos/output_annotated.mp4',
         'entry_log': 'entry_log.json',
         'box_mappings': 'box_mappings.json'
     }
