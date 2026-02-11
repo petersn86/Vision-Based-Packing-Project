@@ -12,29 +12,21 @@
     {
       "instance_id": 4,
       "track_id": 4,
-      "label": "Bottle",
+      "label": "Hand Sanitizer",
       "box_id": "BOX-001",
       "timestamp": 5.667,
       "frame": 12
     },
     {
-      "instance_id": 5,
-      "track_id": 7,
-      "label": "Toilet Paper",
-      "box_id": "BOX-001",
-      "timestamp": 7.084,
-      "frame": 15
-    },
-    {
-      "instance_id": 6,
+      "instance_id": 9,
       "track_id": 14,
-      "label": "Cell Phone",
+      "label": "Calculator",
       "box_id": "BOX-001",
       "timestamp": 10.862,
       "frame": 23
     },
     {
-      "instance_id": 7,
+      "instance_id": 10,
       "track_id": 16,
       "label": "Calculator",
       "box_id": "BOX-001",
@@ -42,7 +34,15 @@
       "frame": 24
     },
     {
-      "instance_id": 8,
+      "instance_id": 11,
+      "track_id": 19,
+      "label": "Calculator",
+      "box_id": "BOX-001",
+      "timestamp": 12.751,
+      "frame": 27
+    },
+    {
+      "instance_id": 12,
       "track_id": 21,
       "label": "Remote Control",
       "box_id": "BOX-001",
@@ -50,7 +50,7 @@
       "frame": 30
     },
     {
-      "instance_id": 9,
+      "instance_id": 13,
       "track_id": 23,
       "label": "Apple",
       "box_id": "BOX-001",
