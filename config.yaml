@@ -78,19 +78,17 @@ box_tracker:
 # Deduplicates items by (label + box_id + recency) rather than track ID.
 # This means a Dial bottle that gets 6 different track IDs still only
 # appears once in the final item list.
+# Item Registry
 item_registry:
-  # Number of frames within which a re-detection of the same label+box
-  # is considered the same physical item rather than a new one.
-  # At 0.5s frame interval:  60 frames = 30 seconds
-  # At 1.0s frame interval:  60 frames = 60 seconds
-  # Increase if items are out of frame for long stretches.
-  # Decrease if genuinely different items of the same type are packed
-  # in rapid succession and being incorrectly merged.
-  # At 0.5s frame interval: 10 frames = 5 seconds.
-  # Keeps legitimate re-detections of the same object merged while
-  # ensuring a different object with the same YOLO label (e.g. screwdriver
-  # also labeled "bottle") gets its own instance after a few seconds gap.
-  same_item_window: 10
+  # Frames within which a re-detection of the same label+box is considered
+  # the same physical item. At 0.5s interval: 20 frames = 10 seconds.
+  same_item_window: 20
+
+  # Minimum Jaccard token similarity for two labels to be treated as the
+  # same item (e.g. "Hand Sanitizer" vs "Hand Soap" share "hand" -> 0.33).
+  # Raise toward 0.6 if unrelated items are merging incorrectly.
+  # Lower toward 0.2 if the same item keeps splitting into new instances.
+  label_similarity_threshold: 0.3
 
 # QR Code Detection
 qr_detection:

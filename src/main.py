@@ -23,6 +23,7 @@ from detection.qr_detector          import QRDetector, BoxItemMapper
 from detection.entry_detector       import EntryDetector
 from detection.plausibility_filter  import PlausibilityFilter
 from detection.item_registry        import ItemRegistry
+from detection.hand_detector        import HandDetector
 import sys, os
 sys.path.insert(0, '..')
 from config_loader                  import get_config
@@ -35,6 +36,17 @@ from datetime import datetime
 
 # ------------------ Project Root ------------------ #
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+# YOLO labels that are too generic to be trusted when LLaMA agrees with them.
+# If LLaMA returns the same label as YOLO AND that label is in this set,
+# the detection is treated as uncertain and merged into the most recent
+# in_box instance rather than creating a new one.
+# Add labels here if you see YOLO misclassifying many different objects
+# as the same class (check the yolo_label column in detection_log.csv).
+UNCERTAIN_YOLO_LABELS = {
+    "bottle", "cell phone", "remote", "refrigerator",
+    "microwave", "tv", "laptop", "cup", "vase", "bowl",
+}
 
 # ------------------ Logging Setup ----------------- #
 def setup_logging(config):
@@ -136,6 +148,14 @@ def main(videoPath=None):
     logger.info(f"Item conf: {conf_threshold} | Box conf: {box_conf_threshold}")
     detector = ObjectDetector(str(yolo_model), str(box_model_path))
 
+    # ---------------- Hand Detector ---------------- #
+    hand_model_path = PROJECT_ROOT / config.get('detection.hand_model', 'models/hands_weights.pt')
+    hand_conf     = config.get('detection.hand_confidence_threshold', conf_threshold)
+    hand_detector = HandDetector(
+        model_path=str(hand_model_path),
+        conf_threshold=hand_conf,
+    )
+
     # ---------------- Plausibility Filter ---------------- #
     plausibility_filter = PlausibilityFilter(
         thresholds=config.get('plausibility_filter.thresholds', {}),
@@ -161,9 +181,16 @@ def main(videoPath=None):
         logger.info("Item tracking disabled")
 
     # ---------------- Item Registry ---------------- #
-    same_item_window = config.get('item_registry.same_item_window', 60)
-    registry = ItemRegistry(same_item_window=same_item_window)
-    logger.info(f"ItemRegistry initialised (same_item_window={same_item_window} frames)")
+    same_item_window          = config.get('item_registry.same_item_window', 20)
+    label_similarity_threshold = config.get('item_registry.label_similarity_threshold', 0.3)
+    registry = ItemRegistry(
+        same_item_window=same_item_window,
+        label_similarity_threshold=label_similarity_threshold
+    )
+    logger.info(
+        f"ItemRegistry initialised (same_item_window={same_item_window} frames, "
+        f"label_similarity_threshold={label_similarity_threshold})"
+    )
 
     # ---------------- Entry Detector ---------------- #
     entry_enabled  = config.get('entry_detection.enabled', True)
@@ -211,12 +238,17 @@ def main(videoPath=None):
         "frame_index", "filename", "timestamp_s",
         "yolo_label", "confidence", "refined_label",
         "track_id", "instance_id", "box_id",
-        "entry_detected", "is_new_item", "plausibility_discarded"
+        "entry_detected", "is_new_item", "hand_detected"
     ])
 
     ignoreLabels                = set(config.get('detection.ignore_labels', []))
     detected_boxes_count        = 0
     total_plausibility_discards = 0
+
+    # Cache: track_id -> refined_label
+    # Once a track has been through LLaMA, subsequent re-detections of the
+    # same track_id skip LLaMA and use the cached label directly.
+    label_cache: dict = {}
 
     logger.info("Running detection pipeline...")
 
@@ -227,7 +259,8 @@ def main(videoPath=None):
         timestamp        = meta_map.get(f.get('filename'), None)
         frame_h, frame_w = originalFrame.shape[:2]
 
-        processed_instances = set()
+        # ---- Hand detection (runs every frame) ----
+        hand_detected = hand_detector.detect(originalFrame)
 
         # ---- YOLO detections ----
         detections = detector.detectObjects(
@@ -265,7 +298,8 @@ def main(videoPath=None):
         if box_detections:
             logger.info(
                 f"Frame {frame_idx}: {len(box_detections)} box(es) | "
-                f"{len(item_detections)} item(s)"
+                f"{len(item_detections)} item(s) | "
+                f"hand_detected={hand_detected}"
             )
 
         # ---- Item tracking ----
@@ -276,10 +310,13 @@ def main(videoPath=None):
 
         # ---- Video annotation ----
         if video_output_enabled:
-            detections_per_frame[frame_idx] = tracked_objects + [
-                {**box, 'track_id': None, 'label': box['box_id']}
-                for box in box_detections
-            ]
+            detections_per_frame[frame_idx] = {
+                'detections': tracked_objects + [
+                    {**box, 'track_id': None, 'label': box['box_id']}
+                    for box in box_detections
+                ],
+                'hand_detected': hand_detected
+            }
 
         # ---- Per-object processing ----
         for obj in tracked_objects:
@@ -291,62 +328,92 @@ def main(videoPath=None):
             if yoloLabel.lower() in ignoreLabels:
                 continue
 
-            # ---- Entry detection ----
-            entry_detected = False
-            box_id         = None
+            # ---- Fast path: cached track_id ----
+            # If we've already refined this track, we know what it is.
+            # Skip LLaMA and go straight to entry detection.
+            if track_id is not None and track_id in label_cache:
+                refined_label = label_cache[track_id]
+                is_uncertain  = False  # cached labels are already trusted
+                logger.debug(
+                    f"[CACHE] Track#{track_id} '{yoloLabel}' "
+                    f"-> '{refined_label}' (cached)"
+                )
 
-            if entry_detector and box_detections:
-                for box_det in box_detections:
-                    box_bbox = box_det['bbox']
+                # ---- Entry detection (cached track) ----
+                entry_detected = False
+                box_id         = None
 
-                    if item_larger_than_box(bbox, box_bbox):
-                        logger.debug(
-                            f"Frame {frame_idx}: Skipping Track#{track_id} '{yoloLabel}' "
-                            f"- item area ({get_bbox_area(bbox)}px2) > "
-                            f"box area ({get_bbox_area(box_bbox)}px2)"
+                if entry_detector and box_detections:
+                    for box_det in box_detections:
+                        box_bbox = box_det['bbox']
+                        if item_larger_than_box(bbox, box_bbox):
+                            continue
+                        confirmed = entry_detector.detect_entry(
+                            track_id=track_id,
+                            item_bbox=bbox,
+                            box_id=box_det['box_id'],
+                            box_bbox=box_bbox,
+                            frame_number=frame_idx,
+                            overlap_threshold=config.get(
+                                'entry_detection.overlap_threshold', 0.5)
                         )
-                        continue
+                        if confirmed:
+                            entry_detected = True
+                            box_id         = box_det['box_id']
+                            logger.info(
+                                f"[ENTRY] Frame {frame_idx}: "
+                                f"Track#{track_id} '{refined_label}' in {box_id}"
+                            )
+                            break
 
-                    confirmed = entry_detector.detect_entry(
-                        track_id=track_id,
-                        item_bbox=bbox,
-                        box_id=box_det['box_id'],       # stable ID from BoxTracker
-                        box_bbox=box_bbox,
-                        frame_number=frame_idx,
-                        overlap_threshold=config.get('entry_detection.overlap_threshold', 0.5)
-                    )
-                    if confirmed:
-                        entry_detected = True
-                        box_id         = box_det['box_id']
-                        logger.info(
-                            f"[ENTRY] Frame {frame_idx}: "
-                            f"Track#{track_id} '{yoloLabel}' in {box_id}"
+                if entry_enabled and not entry_detected:
+                    csv_writer.writerow([
+                        frame_idx, f.get('filename'), timestamp,
+                        yoloLabel, confidence, None,
+                        track_id, None, None,
+                        False, False, hand_detected
+                    ])
+                    continue
+
+            else:
+                # ---- Slow path: new track_id, not yet cached ----
+                # Run entry detection FIRST using bbox geometry (label irrelevant).
+                # Only call LLaMA if the object is actually inside a box —
+                # no point refining something that will never reach the registry.
+
+                entry_detected = False
+                box_id         = None
+
+                if entry_detector and box_detections:
+                    for box_det in box_detections:
+                        box_bbox = box_det['bbox']
+                        if item_larger_than_box(bbox, box_bbox):
+                            continue
+                        confirmed = entry_detector.detect_entry(
+                            track_id=track_id,
+                            item_bbox=bbox,
+                            box_id=box_det['box_id'],
+                            box_bbox=box_bbox,
+                            frame_number=frame_idx,
+                            overlap_threshold=config.get(
+                                'entry_detection.overlap_threshold', 0.5)
                         )
-                        break
+                        if confirmed:
+                            entry_detected = True
+                            box_id         = box_det['box_id']
+                            break
 
-            # ---- Skip if not in a box ----
-            if entry_enabled and not entry_detected:
-                csv_writer.writerow([
-                    frame_idx, f.get('filename'), timestamp,
-                    yoloLabel, confidence,
-                    None, track_id, None, None,
-                    False, False, False
-                ])
-                continue
+                if entry_enabled and not entry_detected:
+                    # Not in a box — log with raw YOLO label, skip LLaMA
+                    csv_writer.writerow([
+                        frame_idx, f.get('filename'), timestamp,
+                        yoloLabel, confidence, None,
+                        track_id, None, None,
+                        False, False, hand_detected
+                    ])
+                    continue
 
-            # ---- Registry deduplication ----
-            instance_id, is_new_item = registry.register_entry(
-                track_id=track_id if track_id is not None else -1,
-                label=yoloLabel,
-                box_id=box_id or "GLOBAL",
-                frame=frame_idx,
-                timestamp=timestamp or 0.0
-            )
-
-            # ---- LLaMA refinement (new items only) ----
-            refined_label = None
-
-            if is_new_item and instance_id not in processed_instances:
+                # Item IS in a box — now worth running LLaMA
                 x1, y1, x2, y2 = bbox
                 crop = originalFrame[y1:y2, x1:x2]
 
@@ -354,67 +421,99 @@ def main(videoPath=None):
                     logger.warning(f"Empty crop for '{yoloLabel}' frame {frame_idx}")
                     refined_label = yoloLabel
                 else:
-                    if config.get('output.save_cropped_images', True):
-                        cv2.imwrite(
-                            str(annotatedDir /
-                                f"frame{frame_idx:05d}_inst{instance_id}_{yoloLabel}.jpg"),
-                            crop
-                        )
-
+                    # Pass confirmed labels for this box as context
+                    box_context = registry.get_unique_labels_for_box(
+                        box_id or "GLOBAL"
+                    )
                     if reasoner:
-                        refined_label = reasoner.refineDetection(crop, yoloLabel)
+                        refined_label = reasoner.refineDetection(
+                            crop, yoloLabel, box_context=box_context
+                        )
                     refined_label = refined_label or yoloLabel
 
-                    # ---- Plausibility check on REFINED label ----
-                    # If LLaMA corrected "refrigerator" -> "Tissue Box" it passes.
-                    # If LLaMA confirmed "refrigerator" or fell back to it, discard.
+                    # ---- Plausibility check on refined label ----
                     _, discards = plausibility_filter.filter(
-                        [{'label': refined_label, 'confidence': confidence, 'bbox': bbox}],
+                        [{'label': refined_label, 'confidence': confidence,
+                          'bbox': bbox}],
                         frame_w, frame_h
                     )
                     if discards:
                         total_plausibility_discards += 1
                         logger.info(
-                            f"[PLAUSIBILITY] Instance #{instance_id} discarded after LLaMA: "
-                            f"YOLO='{yoloLabel}' -> LLaMA='{refined_label}' "
-                            f"(bbox too small for '{refined_label}')"
-                        )
-                        # Remove from registry — it turned out to be implausible
-                        registry._instances.pop(instance_id, None)
-                        registry._track_to_instance.pop(
-                            track_id if track_id is not None else -1, None
+                            f"[PLAUSIBILITY] Discarded: YOLO='{yoloLabel}' "
+                            f"-> LLaMA='{refined_label}' (bbox too small)"
                         )
                         csv_writer.writerow([
                             frame_idx, f.get('filename'), timestamp,
                             yoloLabel, confidence, refined_label,
-                            track_id, instance_id, box_id,
-                            entry_detected, is_new_item, True
+                            track_id, None, None,
+                            False, False, hand_detected
                         ])
                         continue
 
-                    registry.set_refined_label(instance_id, refined_label)
-                    processed_instances.add(instance_id)
+                    if config.get('output.save_cropped_images', True):
+                        cv2.imwrite(
+                            str(annotatedDir /
+                                f"frame{frame_idx:05d}_{yoloLabel}.jpg"),
+                            crop
+                        )
 
+                # Cache the refined label for this track_id
+                if track_id is not None:
+                    label_cache[track_id] = refined_label
+
+                # Flag whether this is a genuinely uncertain LLaMA response.
+                # LLaMA confirming YOLO is only uncertain when the YOLO label
+                # is itself generic — a class YOLO commonly misapplies to many
+                # different objects (e.g. "bottle" for soap, screwdriver, water
+                # bottle etc.). For specific labels like "apple" or "book",
+                # LLaMA agreeing with YOLO is a confident correct answer.
+                is_uncertain = (
+                    refined_label.lower().strip() == yoloLabel.lower().strip()
+                    and yoloLabel.lower().strip() in UNCERTAIN_YOLO_LABELS
+                )
+
+                logger.info(
+                    f"[REFINED] Frame {frame_idx}: Track#{track_id} "
+                    f"'{yoloLabel}' -> '{refined_label}' | "
+                    f"context={box_context if box_context else '[]'}"
+                )
+
+                if entry_detected:
                     logger.info(
-                        f"[NEW ITEM] Instance #{instance_id} "
-                        f"Track#{track_id} '{yoloLabel}' -> '{refined_label}' "
-                        f"-> {box_id} at {timestamp}s"
+                        f"[ENTRY] Frame {frame_idx}: "
+                        f"Track#{track_id} '{refined_label}' in {box_id}"
                     )
+
+            # ---- Registry deduplication (uses refined label) ----
+            instance_id, is_new_item = registry.register_entry(
+                track_id=track_id if track_id is not None else -1,
+                refined_label=refined_label,
+                box_id=box_id or "GLOBAL",
+                frame=frame_idx,
+                timestamp=timestamp or 0.0,
+                yolo_label=yoloLabel,
+                is_uncertain=is_uncertain
+            )
+
+            if is_new_item:
+                logger.info(
+                    f"[NEW ITEM] Instance #{instance_id} "
+                    f"Track#{track_id} '{yoloLabel}' -> '{refined_label}' "
+                    f"-> {box_id} at {timestamp}s"
+                )
             else:
-                inst          = registry.get_instance(instance_id)
-                refined_label = (inst.refined_label or inst.label) if inst else yoloLabel
-                if not is_new_item:
-                    logger.debug(
-                        f"[RE-DET] Instance #{instance_id} Track#{track_id} "
-                        f"'{yoloLabel}' (already recorded as '{refined_label}')"
-                    )
+                logger.debug(
+                    f"[RE-DET] Instance #{instance_id} Track#{track_id} "
+                    f"'{refined_label}'"
+                )
 
             # ---- CSV row ----
             csv_writer.writerow([
                 frame_idx, f.get('filename'), timestamp,
                 yoloLabel, confidence, refined_label,
                 track_id, instance_id, box_id,
-                entry_detected, is_new_item, False
+                entry_detected, is_new_item, hand_detected
             ])
 
     # ---------------- Annotated video ---------------- #
@@ -423,8 +522,13 @@ def main(videoPath=None):
         for fd in framesData:
             fi = fd['index']
             ts = meta_map.get(fd.get('filename'))
+            frame_data = detections_per_frame.get(fi, {})
             annotator.add_frame(
-                fd['frame'], detections_per_frame.get(fi, []), fi, ts
+                fd['frame'],
+                frame_data.get('detections', []),
+                fi,
+                ts,
+                frame_data.get('hand_detected', False)
             )
         annotator.finalize()
 
@@ -436,6 +540,7 @@ def main(videoPath=None):
     logger.info(f"Total instances         : {len(all_items)}")
     logger.info(f"Total box detections    : {detected_boxes_count}")
     logger.info(f"Plausibility discards   : {total_plausibility_discards}")
+
     # refined_item_list.txt
     with open(final_output_file, 'w', encoding='utf-8') as fout:
         for idx, name in enumerate(unique_labels, 1):

@@ -6,7 +6,8 @@
 # Description:
 # Creates annotated video output with bounding boxes,
 # labels, confidence scores, and tracking IDs overlaid
-# on the original video frames.
+# on the original video frames. Optionally displays a
+# hand-detected indicator banner when hand_detected=True.
 #
 ##############################################
 
@@ -70,7 +71,8 @@ class VideoAnnotator:
                        frame: np.ndarray, 
                        detections: List[Dict],
                        frame_number: Optional[int] = None,
-                       timestamp: Optional[float] = None) -> np.ndarray:
+                       timestamp: Optional[float] = None,
+                       hand_detected: bool = False) -> np.ndarray:
         """
         Annotate a single frame with detections
         
@@ -79,6 +81,7 @@ class VideoAnnotator:
             detections: List of detection dicts with bbox, label, confidence, track_id
             frame_number: Optional frame number to display
             timestamp: Optional timestamp to display
+            hand_detected: If True, draw a hand-detected banner on the frame
             
         Returns:
             Annotated frame
@@ -161,6 +164,35 @@ class VideoAnnotator:
                 1
             )
             y_offset += 25
+
+        # Draw hand detected banner at the bottom of the frame
+        if hand_detected:
+            h, w = annotated.shape[:2]
+            banner_height = 40
+            banner_y = h - banner_height
+
+            # Semi-transparent red background
+            overlay = annotated.copy()
+            cv2.rectangle(overlay, (0, banner_y), (w, h), (0, 0, 200), -1)
+            cv2.addWeighted(overlay, 0.6, annotated, 0.4, 0, annotated)
+
+            # Banner text
+            banner_text = "HAND DETECTED"
+            (tw, th), bl = cv2.getTextSize(
+                banner_text, cv2.FONT_HERSHEY_DUPLEX, 0.8, 2
+            )
+            text_x = (w - tw) // 2
+            text_y = banner_y + (banner_height + th) // 2
+
+            cv2.putText(
+                annotated,
+                banner_text,
+                (text_x, text_y),
+                cv2.FONT_HERSHEY_DUPLEX,
+                0.8,
+                (255, 255, 255),
+                2
+            )
         
         return annotated
     
@@ -168,7 +200,8 @@ class VideoAnnotator:
                   frame: np.ndarray, 
                   detections: List[Dict],
                   frame_number: Optional[int] = None,
-                  timestamp: Optional[float] = None):
+                  timestamp: Optional[float] = None,
+                  hand_detected: bool = False):
         """
         Add annotated frame to output video
         
@@ -177,13 +210,16 @@ class VideoAnnotator:
             detections: List of detections
             frame_number: Optional frame number
             timestamp: Optional timestamp
+            hand_detected: If True, draw hand-detected banner
         """
         # Initialize writer on first frame
         if self.writer is None:
             self._init_writer(frame.shape)
         
         # Annotate and write frame
-        annotated = self.annotate_frame(frame, detections, frame_number, timestamp)
+        annotated = self.annotate_frame(
+            frame, detections, frame_number, timestamp, hand_detected
+        )
         self.writer.write(annotated)
     
     def finalize(self):

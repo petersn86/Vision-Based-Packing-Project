@@ -57,7 +57,6 @@ DEFAULT_MIN_FRAME_FRACTION: Dict[str, float] = {
     # Laundry
     "washing machine":  0.50,
     "washer":           0.50,
-    "dryer":            0.50,
 
     # Large electronics
     "television":       0.30,
