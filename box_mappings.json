@@ -1,153 +1,45 @@
 {
   "boxes": {
-    "BOX-7-0": [
+    "BOX-001": [
       {
-        "track_id": 38,
-        "label": "Tissue Box",
-        "timestamp": 3.306
-      }
-    ],
-    "BOX-12-0": [
-      {
-        "track_id": 39,
-        "label": "Bottle",
-        "timestamp": 5.667
-      }
-    ],
-    "BOX-13-0": [
-      {
-        "track_id": 40,
-        "label": "Bottle",
-        "timestamp": 6.14
-      }
-    ],
-    "BOX-14-0": [
-      {
-        "track_id": 41,
-        "label": "Bottle",
-        "timestamp": 6.612
-      }
-    ],
-    "BOX-15-0": [
-      {
-        "track_id": 42,
-        "label": "Tissue Box",
-        "timestamp": 7.084
+        "track_id": 1,
+        "label": "Book",
+        "timestamp": 2.361
       },
       {
-        "track_id": 43,
-        "label": "Bottle",
-        "timestamp": 7.084
-      }
-    ],
-    "BOX-18-0": [
+        "track_id": 4,
+        "label": "Hand Sanitizer",
+        "timestamp": 5.667
+      },
       {
-        "track_id": 44,
-        "label": "Bottle",
-        "timestamp": 8.501
-      }
-    ],
-    "BOX-19-0": [
-      {
-        "track_id": 45,
-        "label": "Toilet Paper",
-        "timestamp": 8.973
-      }
-    ],
-    "BOX-23-0": [
-      {
-        "track_id": 46,
-        "label": "Cell Phone",
+        "track_id": 14,
+        "label": "Calculator",
         "timestamp": 10.862
-      }
-    ],
-    "BOX-24-0": [
+      },
       {
-        "track_id": 47,
+        "track_id": 16,
         "label": "Calculator",
         "timestamp": 11.335
-      }
-    ],
-    "BOX-25-0": [
+      },
       {
-        "track_id": 48,
+        "track_id": 19,
         "label": "Calculator",
-        "timestamp": 11.807
-      }
-    ],
-    "BOX-26-0": [
+        "timestamp": 12.751
+      },
       {
-        "track_id": 49,
-        "label": "Cell Phone",
-        "timestamp": 12.279
-      }
-    ],
-    "BOX-28-0": [
-      {
-        "track_id": 50,
-        "label": "Bottle",
-        "timestamp": 13.224
-      }
-    ],
-    "BOX-30-0": [
-      {
-        "track_id": 51,
-        "label": "Calculator",
+        "track_id": 21,
+        "label": "Remote Control",
         "timestamp": 14.168
-      }
-    ],
-    "BOX-34-0": [
+      },
       {
-        "track_id": 52,
+        "track_id": 23,
         "label": "Apple",
         "timestamp": 16.057
-      }
-    ],
-    "BOX-35-0": [
-      {
-        "track_id": 53,
-        "label": "Apple",
-        "timestamp": 16.529
-      }
-    ],
-    "BOX-36-0": [
-      {
-        "track_id": 54,
-        "label": "Apple",
-        "timestamp": 17.002
-      }
-    ],
-    "BOX-37-0": [
-      {
-        "track_id": 55,
-        "label": "Apple",
-        "timestamp": 17.474
-      }
-    ],
-    "BOX-38-0": [
-      {
-        "track_id": 56,
-        "label": "Apple",
-        "timestamp": 17.946
-      }
-    ],
-    "BOX-40-0": [
-      {
-        "track_id": 57,
-        "label": "Apple",
-        "timestamp": 18.891
-      }
-    ],
-    "BOX-43-0": [
-      {
-        "track_id": 58,
-        "label": "Apple",
-        "timestamp": 20.308
       }
     ]
   },
   "summary": {
-    "total_boxes": 20,
-    "total_items": 21
+    "total_boxes": 1,
+    "total_items": 7
   }
 }
