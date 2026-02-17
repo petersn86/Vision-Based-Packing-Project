@@ -2,49 +2,34 @@
   "boxes": {
     "BOX-001": [
       {
-        "track_id": 30,
-        "label": "Book",
-        "timestamp": 16.0
-      },
-      {
-        "track_id": 33,
+        "track_id": 2,
         "label": "Bottle",
-        "timestamp": 19.5
+        "timestamp": 5.667
       },
       {
-        "track_id": 34,
-        "label": "Scissors",
-        "timestamp": 23.5
+        "track_id": 5,
+        "label": "Toilet Paper",
+        "timestamp": 7.084
       },
       {
-        "track_id": 35,
-        "label": "Cup",
-        "timestamp": 23.5
+        "track_id": 10,
+        "label": "Calculator",
+        "timestamp": 11.335
       },
       {
-        "track_id": 37,
-        "label": "Hairdryer",
-        "timestamp": 24.5
+        "track_id": 17,
+        "label": "Apple",
+        "timestamp": 16.057
       },
       {
-        "track_id": 45,
-        "label": "Toothbrush",
-        "timestamp": 27.5
-      },
-      {
-        "track_id": 51,
-        "label": "Backpack",
-        "timestamp": 30.0
-      },
-      {
-        "track_id": 56,
-        "label": "Handbag",
-        "timestamp": 32.0
+        "track_id": 24,
+        "label": "Screwdriver",
+        "timestamp": 19.835
       }
     ]
   },
   "summary": {
     "total_boxes": 1,
-    "total_items": 8
+    "total_items": 5
   }
 }

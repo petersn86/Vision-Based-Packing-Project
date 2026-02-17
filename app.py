@@ -8,6 +8,9 @@
 # Project. Provides upload interface, processing status,
 # and results visualization.
 #
+# FIXED: Added encoding='utf-8' to all file reads/writes
+#        to prevent Windows charmap errors.
+#
 ##############################################
 
 from flask import Flask, render_template, request, jsonify, send_file, url_for
@@ -50,7 +53,6 @@ def run_cleanup():
     """
     try:
         import sys
-        # Import cleanup from project root
         import importlib.util
         cleanup_path = Path(__file__).parent / 'cleanup.py'
         spec = importlib.util.spec_from_file_location("cleanup", cleanup_path)
@@ -70,32 +72,39 @@ def process_video_async(video_path, job_id):
         processing_status[job_id]['status'] = 'processing'
         processing_status[job_id]['message'] = 'Cleaning up previous run...'
 
-        # Run cleanup before starting so stale frames don't affect the new job
         run_cleanup()
 
         processing_status[job_id]['message'] = 'Extracting frames...'
 
-        # Import main processing function
         import sys
         sys.path.insert(0, 'src')
+
+        # ---- Windows UTF-8 fix (env vars only, no stdout wrapping in threads) ----
+        import os
+        os.environ['PYTHONUTF8'] = '1'
+        os.environ['PYTHONIOENCODING'] = 'utf-8' 
+
         from main import main as process_pipeline
-        
-        # Run processing
         process_pipeline(video_path)
-        
+
         processing_status[job_id]['status'] = 'completed'
         processing_status[job_id]['message'] = 'Processing complete!'
         processing_status[job_id]['completed_at'] = datetime.now().isoformat()
-        
-        # Load results
+
+        # ---- FIX: Always use encoding='utf-8' when reading files ----
         try:
             with open('refined_item_list.txt', 'r', encoding='utf-8') as f:
                 items = [line.strip() for line in f if line.strip()]
             processing_status[job_id]['items'] = items
             processing_status[job_id]['item_count'] = len(items)
-        except:
+        except FileNotFoundError:
             processing_status[job_id]['items'] = []
-        
+            processing_status[job_id]['item_count'] = 0
+        except Exception as e:
+            print(f"[WARNING] Could not read item list: {e}")
+            processing_status[job_id]['items'] = []
+            processing_status[job_id]['item_count'] = 0
+
         # Check for output files
         processing_status[job_id]['files'] = {
             'detection_log': os.path.exists('detection_log.csv'),
@@ -104,11 +113,14 @@ def process_video_async(video_path, job_id):
             'entry_log': os.path.exists('entry_log.json'),
             'box_mappings': os.path.exists('box_mappings.json')
         }
-        
+
     except Exception as e:
         processing_status[job_id]['status'] = 'error'
         processing_status[job_id]['message'] = f'Error: {str(e)}'
         processing_status[job_id]['error'] = str(e)
+        print(f"[ERROR] Processing failed: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 @app.route('/')
@@ -122,25 +134,25 @@ def upload_file():
     """Handle video upload"""
     if 'video' not in request.files:
         return jsonify({'error': 'No file uploaded'}), 400
-    
+
     file = request.files['video']
-    
+
     if file.filename == '':
         return jsonify({'error': 'No file selected'}), 400
-    
+
     if not allowed_file(file.filename):
         return jsonify({'error': 'Invalid file type. Allowed: mp4, avi, mov, mkv'}), 400
-    
+
     # Save uploaded file
     filename = secure_filename(file.filename)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     unique_filename = f"{timestamp}_{filename}"
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
     file.save(filepath)
-    
+
     # Create job ID
     job_id = timestamp
-    
+
     # Initialize processing status
     processing_status[job_id] = {
         'job_id': job_id,
@@ -150,14 +162,14 @@ def upload_file():
         'uploaded_at': datetime.now().isoformat(),
         'filepath': filepath
     }
-    
-    # Start processing in background (cleanup runs as first step inside)
+
+    # Start processing in background
     thread = threading.Thread(
         target=process_video_async,
         args=(filepath, job_id)
     )
     thread.start()
-    
+
     return jsonify({
         'job_id': job_id,
         'message': 'Upload successful, processing started'
@@ -169,7 +181,7 @@ def get_status(job_id):
     """Get processing status"""
     if job_id not in processing_status:
         return jsonify({'error': 'Job not found'}), 404
-    
+
     return jsonify(processing_status[job_id])
 
 
@@ -178,45 +190,46 @@ def get_results(job_id):
     """Get detailed results"""
     if job_id not in processing_status:
         return jsonify({'error': 'Job not found'}), 404
-    
+
     status = processing_status[job_id]
-    
+
     if status['status'] != 'completed':
         return jsonify({'error': 'Processing not complete'}), 400
-    
+
     results = {
         'job_id': job_id,
         'items': status.get('items', []),
         'item_count': status.get('item_count', 0),
         'files': status.get('files', {})
     }
-    
-    # Load detection log if available
+
+    # ---- FIX: encoding='utf-8' on all file reads ----
     if os.path.exists('detection_log.csv'):
         import csv
         detections = []
-        with open('detection_log.csv', 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                detections.append(row)
-        results['detections'] = detections[:100]  # Limit to first 100
-    
-    # Load entry log if available
+        try:
+            with open('detection_log.csv', 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    detections.append(row)
+            results['detections'] = detections[:100]
+        except Exception as e:
+            print(f"[WARNING] Could not read detection log: {e}")
+
     if os.path.exists('entry_log.json'):
         try:
             with open('entry_log.json', 'r', encoding='utf-8') as f:
                 results['entry_log'] = json.load(f)
-        except:
-            pass
-    
-    # Load box mappings if available
+        except Exception as e:
+            print(f"[WARNING] Could not read entry log: {e}")
+
     if os.path.exists('box_mappings.json'):
         try:
             with open('box_mappings.json', 'r', encoding='utf-8') as f:
                 results['box_mappings'] = json.load(f)
-        except:
-            pass
-    
+        except Exception as e:
+            print(f"[WARNING] Could not read box mappings: {e}")
+
     return jsonify(results)
 
 
@@ -230,15 +243,15 @@ def download_file(file_type):
         'entry_log': 'entry_log.json',
         'box_mappings': 'box_mappings.json'
     }
-    
+
     if file_type not in files:
         return jsonify({'error': 'Invalid file type'}), 400
-    
+
     filepath = files[file_type]
-    
+
     if not os.path.exists(filepath):
         return jsonify({'error': f'File not found: {filepath}'}), 404
-    
+
     return send_file(filepath, as_attachment=True)
 
 
@@ -252,6 +265,11 @@ def health():
 
 
 if __name__ == '__main__':
+    # ---- Windows UTF-8 fix ----
+    import sys, os
+    os.environ['PYTHONUTF8'] = '1'
+    os.environ['PYTHONIOENCODING'] = 'utf-8' 
+
     print("[INFO] Starting Vision-Based Packing Web Interface")
     print("[INFO] Access at: http://localhost:5000")
     app.run(debug=True, host='0.0.0.0', port=5000)

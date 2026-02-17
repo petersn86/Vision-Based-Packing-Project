@@ -2,140 +2,92 @@
   "items": [
     {
       "instance_id": 1,
-      "label": "Book",
+      "label": "Bottle",
       "box_id": "BOX-001",
       "track_ids": [
-        30,
-        31,
-        32
+        2,
+        3,
+        4,
+        6,
+        7,
+        8,
+        9,
+        14
       ],
-      "first_frame": 32,
-      "last_frame": 36,
-      "first_ts": 16.0,
-      "last_ts": 18.0,
+      "first_frame": 12,
+      "last_frame": 29,
+      "first_ts": 5.667,
+      "last_ts": 13.696,
       "status": "in_box",
       "exit_frame": null,
       "exit_ts": null
     },
     {
       "instance_id": 2,
-      "label": "Bottle",
+      "label": "Toilet Paper",
       "box_id": "BOX-001",
       "track_ids": [
-        33,
-        41,
-        42,
-        53
+        5
       ],
-      "first_frame": 39,
-      "last_frame": 63,
-      "first_ts": 19.5,
-      "last_ts": 31.5,
+      "first_frame": 15,
+      "last_frame": 15,
+      "first_ts": 7.084,
+      "last_ts": 7.084,
       "status": "in_box",
       "exit_frame": null,
       "exit_ts": null
     },
     {
       "instance_id": 3,
-      "label": "Scissors",
+      "label": "Calculator",
       "box_id": "BOX-001",
       "track_ids": [
-        34,
-        36,
-        38,
-        39,
-        40,
-        43,
-        44,
-        46,
-        47,
-        48,
-        49,
-        50,
-        52,
-        54,
-        55,
-        57
+        10,
+        11,
+        12,
+        15,
+        21
       ],
-      "first_frame": 47,
-      "last_frame": 67,
-      "first_ts": 23.5,
-      "last_ts": 33.5,
+      "first_frame": 24,
+      "last_frame": 38,
+      "first_ts": 11.335,
+      "last_ts": 17.946,
       "status": "in_box",
       "exit_frame": null,
       "exit_ts": null
     },
     {
       "instance_id": 4,
-      "label": "Cup",
+      "label": "Apple",
       "box_id": "BOX-001",
       "track_ids": [
-        35
+        17,
+        18,
+        19,
+        20,
+        22,
+        23,
+        25
       ],
-      "first_frame": 47,
-      "last_frame": 47,
-      "first_ts": 23.5,
-      "last_ts": 23.5,
+      "first_frame": 34,
+      "last_frame": 43,
+      "first_ts": 16.057,
+      "last_ts": 20.308,
       "status": "in_box",
       "exit_frame": null,
       "exit_ts": null
     },
     {
       "instance_id": 5,
-      "label": "Hairdryer",
+      "label": "Screwdriver",
       "box_id": "BOX-001",
       "track_ids": [
-        37
+        24
       ],
-      "first_frame": 49,
-      "last_frame": 49,
-      "first_ts": 24.5,
-      "last_ts": 24.5,
-      "status": "in_box",
-      "exit_frame": null,
-      "exit_ts": null
-    },
-    {
-      "instance_id": 6,
-      "label": "Toothbrush",
-      "box_id": "BOX-001",
-      "track_ids": [
-        45
-      ],
-      "first_frame": 55,
-      "last_frame": 55,
-      "first_ts": 27.5,
-      "last_ts": 27.5,
-      "status": "in_box",
-      "exit_frame": null,
-      "exit_ts": null
-    },
-    {
-      "instance_id": 7,
-      "label": "Backpack",
-      "box_id": "BOX-001",
-      "track_ids": [
-        51
-      ],
-      "first_frame": 60,
-      "last_frame": 60,
-      "first_ts": 30.0,
-      "last_ts": 30.0,
-      "status": "in_box",
-      "exit_frame": null,
-      "exit_ts": null
-    },
-    {
-      "instance_id": 8,
-      "label": "Handbag",
-      "box_id": "BOX-001",
-      "track_ids": [
-        56
-      ],
-      "first_frame": 64,
-      "last_frame": 64,
-      "first_ts": 32.0,
-      "last_ts": 32.0,
+      "first_frame": 42,
+      "last_frame": 42,
+      "first_ts": 19.835,
+      "last_ts": 19.835,
       "status": "in_box",
       "exit_frame": null,
       "exit_ts": null
@@ -145,140 +97,92 @@
     "BOX-001": [
       {
         "instance_id": 1,
-        "label": "Book",
+        "label": "Bottle",
         "box_id": "BOX-001",
         "track_ids": [
-          30,
-          31,
-          32
+          2,
+          3,
+          4,
+          6,
+          7,
+          8,
+          9,
+          14
         ],
-        "first_frame": 32,
-        "last_frame": 36,
-        "first_ts": 16.0,
-        "last_ts": 18.0,
+        "first_frame": 12,
+        "last_frame": 29,
+        "first_ts": 5.667,
+        "last_ts": 13.696,
         "status": "in_box",
         "exit_frame": null,
         "exit_ts": null
       },
       {
         "instance_id": 2,
-        "label": "Bottle",
+        "label": "Toilet Paper",
         "box_id": "BOX-001",
         "track_ids": [
-          33,
-          41,
-          42,
-          53
+          5
         ],
-        "first_frame": 39,
-        "last_frame": 63,
-        "first_ts": 19.5,
-        "last_ts": 31.5,
+        "first_frame": 15,
+        "last_frame": 15,
+        "first_ts": 7.084,
+        "last_ts": 7.084,
         "status": "in_box",
         "exit_frame": null,
         "exit_ts": null
       },
       {
         "instance_id": 3,
-        "label": "Scissors",
+        "label": "Calculator",
         "box_id": "BOX-001",
         "track_ids": [
-          34,
-          36,
-          38,
-          39,
-          40,
-          43,
-          44,
-          46,
-          47,
-          48,
-          49,
-          50,
-          52,
-          54,
-          55,
-          57
+          10,
+          11,
+          12,
+          15,
+          21
         ],
-        "first_frame": 47,
-        "last_frame": 67,
-        "first_ts": 23.5,
-        "last_ts": 33.5,
+        "first_frame": 24,
+        "last_frame": 38,
+        "first_ts": 11.335,
+        "last_ts": 17.946,
         "status": "in_box",
         "exit_frame": null,
         "exit_ts": null
       },
       {
         "instance_id": 4,
-        "label": "Cup",
+        "label": "Apple",
         "box_id": "BOX-001",
         "track_ids": [
-          35
+          17,
+          18,
+          19,
+          20,
+          22,
+          23,
+          25
         ],
-        "first_frame": 47,
-        "last_frame": 47,
-        "first_ts": 23.5,
-        "last_ts": 23.5,
+        "first_frame": 34,
+        "last_frame": 43,
+        "first_ts": 16.057,
+        "last_ts": 20.308,
         "status": "in_box",
         "exit_frame": null,
         "exit_ts": null
       },
       {
         "instance_id": 5,
-        "label": "Hairdryer",
+        "label": "Screwdriver",
         "box_id": "BOX-001",
         "track_ids": [
-          37
+          24
         ],
-        "first_frame": 49,
-        "last_frame": 49,
-        "first_ts": 24.5,
-        "last_ts": 24.5,
-        "status": "in_box",
-        "exit_frame": null,
-        "exit_ts": null
-      },
-      {
-        "instance_id": 6,
-        "label": "Toothbrush",
-        "box_id": "BOX-001",
-        "track_ids": [
-          45
-        ],
-        "first_frame": 55,
-        "last_frame": 55,
-        "first_ts": 27.5,
-        "last_ts": 27.5,
-        "status": "in_box",
-        "exit_frame": null,
-        "exit_ts": null
-      },
-      {
-        "instance_id": 7,
-        "label": "Backpack",
-        "box_id": "BOX-001",
-        "track_ids": [
-          51
-        ],
-        "first_frame": 60,
-        "last_frame": 60,
-        "first_ts": 30.0,
-        "last_ts": 30.0,
-        "status": "in_box",
-        "exit_frame": null,
-        "exit_ts": null
-      },
-      {
-        "instance_id": 8,
-        "label": "Handbag",
-        "box_id": "BOX-001",
-        "track_ids": [
-          56
-        ],
-        "first_frame": 64,
-        "last_frame": 64,
-        "first_ts": 32.0,
-        "last_ts": 32.0,
+        "first_frame": 42,
+        "last_frame": 42,
+        "first_ts": 19.835,
+        "last_ts": 19.835,
         "status": "in_box",
         "exit_frame": null,
         "exit_ts": null
@@ -286,18 +190,15 @@
     ]
   },
   "summary": {
-    "total_unique_items": 8,
-    "items_in_box": 8,
+    "total_unique_items": 5,
+    "items_in_box": 5,
     "items_removed": 0,
     "unique_labels": [
-      "Backpack",
-      "Book",
+      "Apple",
       "Bottle",
-      "Cup",
-      "Hairdryer",
-      "Handbag",
-      "Scissors",
-      "Toothbrush"
+      "Calculator",
+      "Screwdriver",
+      "Toilet Paper"
     ]
   }
 }
