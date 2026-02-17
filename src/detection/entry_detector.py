@@ -110,6 +110,14 @@ class EntryDetector:
         # Calculate overlap
         overlap = self.get_overlap_percentage(item_bbox, box_bbox)
         is_inside = overlap >= overlap_threshold
+
+        print(
+            f"[ENTRY DEBUG] Frame={frame_number} "
+            f"Track={track_id} Box={box_id} "
+            f"Overlap={overlap:.3f} "
+            f"Threshold={overlap_threshold} "
+            f"Inside={is_inside}"
+)
         
         # Update history
         self.track_history[track_id].append({
