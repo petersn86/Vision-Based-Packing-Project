@@ -5,14 +5,14 @@
       "label": "Bottle",
       "box_id": "BOX-001",
       "track_ids": [
+        0,
+        1,
         2,
         3,
         4,
+        5,
         6,
-        7,
-        8,
-        9,
-        14
+        10
       ],
       "first_frame": 12,
       "last_frame": 29,
@@ -24,50 +24,33 @@
     },
     {
       "instance_id": 2,
-      "label": "Toilet Paper",
+      "label": "Calculator",
       "box_id": "BOX-001",
       "track_ids": [
-        5
+        7,
+        8,
+        9
       ],
-      "first_frame": 15,
-      "last_frame": 15,
-      "first_ts": 7.084,
-      "last_ts": 7.084,
+      "first_frame": 24,
+      "last_frame": 25,
+      "first_ts": 11.335,
+      "last_ts": 11.807,
       "status": "in_box",
       "exit_frame": null,
       "exit_ts": null
     },
     {
       "instance_id": 3,
-      "label": "Calculator",
-      "box_id": "BOX-001",
-      "track_ids": [
-        10,
-        11,
-        12,
-        15,
-        21
-      ],
-      "first_frame": 24,
-      "last_frame": 38,
-      "first_ts": 11.335,
-      "last_ts": 17.946,
-      "status": "in_box",
-      "exit_frame": null,
-      "exit_ts": null
-    },
-    {
-      "instance_id": 4,
       "label": "Apple",
       "box_id": "BOX-001",
       "track_ids": [
-        17,
-        18,
-        19,
-        20,
-        22,
-        23,
-        25
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        18
       ],
       "first_frame": 34,
       "last_frame": 43,
@@ -78,11 +61,11 @@
       "exit_ts": null
     },
     {
-      "instance_id": 5,
+      "instance_id": 4,
       "label": "Screwdriver",
       "box_id": "BOX-001",
       "track_ids": [
-        24
+        17
       ],
       "first_frame": 42,
       "last_frame": 42,
@@ -100,14 +83,14 @@
         "label": "Bottle",
         "box_id": "BOX-001",
         "track_ids": [
+          0,
+          1,
           2,
           3,
           4,
+          5,
           6,
-          7,
-          8,
-          9,
-          14
+          10
         ],
         "first_frame": 12,
         "last_frame": 29,
@@ -119,50 +102,33 @@
       },
       {
         "instance_id": 2,
-        "label": "Toilet Paper",
+        "label": "Calculator",
         "box_id": "BOX-001",
         "track_ids": [
-          5
+          7,
+          8,
+          9
         ],
-        "first_frame": 15,
-        "last_frame": 15,
-        "first_ts": 7.084,
-        "last_ts": 7.084,
+        "first_frame": 24,
+        "last_frame": 25,
+        "first_ts": 11.335,
+        "last_ts": 11.807,
         "status": "in_box",
         "exit_frame": null,
         "exit_ts": null
       },
       {
         "instance_id": 3,
-        "label": "Calculator",
-        "box_id": "BOX-001",
-        "track_ids": [
-          10,
-          11,
-          12,
-          15,
-          21
-        ],
-        "first_frame": 24,
-        "last_frame": 38,
-        "first_ts": 11.335,
-        "last_ts": 17.946,
-        "status": "in_box",
-        "exit_frame": null,
-        "exit_ts": null
-      },
-      {
-        "instance_id": 4,
         "label": "Apple",
         "box_id": "BOX-001",
         "track_ids": [
-          17,
-          18,
-          19,
-          20,
-          22,
-          23,
-          25
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          18
         ],
         "first_frame": 34,
         "last_frame": 43,
@@ -173,11 +139,11 @@
         "exit_ts": null
       },
       {
-        "instance_id": 5,
+        "instance_id": 4,
         "label": "Screwdriver",
         "box_id": "BOX-001",
         "track_ids": [
-          24
+          17
         ],
         "first_frame": 42,
         "last_frame": 42,
@@ -190,15 +156,14 @@
     ]
   },
   "summary": {
-    "total_unique_items": 5,
-    "items_in_box": 5,
+    "total_unique_items": 4,
+    "items_in_box": 4,
     "items_removed": 0,
     "unique_labels": [
       "Apple",
       "Bottle",
       "Calculator",
-      "Screwdriver",
-      "Toilet Paper"
+      "Screwdriver"
     ]
   }
 }

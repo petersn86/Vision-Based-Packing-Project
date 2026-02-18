@@ -1,9 +1,9 @@
 {
-  "total_entries": 5,
+  "total_entries": 4,
   "entries": [
     {
       "instance_id": 1,
-      "track_id": 2,
+      "track_id": 0,
       "label": "Bottle",
       "box_id": "BOX-001",
       "timestamp": 5.667,
@@ -11,31 +11,23 @@
     },
     {
       "instance_id": 2,
-      "track_id": 5,
-      "label": "Toilet Paper",
-      "box_id": "BOX-001",
-      "timestamp": 7.084,
-      "frame": 15
-    },
-    {
-      "instance_id": 3,
-      "track_id": 10,
+      "track_id": 7,
       "label": "Calculator",
       "box_id": "BOX-001",
       "timestamp": 11.335,
       "frame": 24
     },
     {
-      "instance_id": 4,
-      "track_id": 17,
+      "instance_id": 3,
+      "track_id": 11,
       "label": "Apple",
       "box_id": "BOX-001",
       "timestamp": 16.057,
       "frame": 34
     },
     {
-      "instance_id": 5,
-      "track_id": 24,
+      "instance_id": 4,
+      "track_id": 17,
       "label": "Screwdriver",
       "box_id": "BOX-001",
       "timestamp": 19.835,

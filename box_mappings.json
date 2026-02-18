@@ -2,27 +2,22 @@
   "boxes": {
     "BOX-001": [
       {
-        "track_id": 2,
+        "track_id": 0,
         "label": "Bottle",
         "timestamp": 5.667
       },
       {
-        "track_id": 5,
-        "label": "Toilet Paper",
-        "timestamp": 7.084
-      },
-      {
-        "track_id": 10,
+        "track_id": 7,
         "label": "Calculator",
         "timestamp": 11.335
       },
       {
-        "track_id": 17,
+        "track_id": 11,
         "label": "Apple",
         "timestamp": 16.057
       },
       {
-        "track_id": 24,
+        "track_id": 17,
         "label": "Screwdriver",
         "timestamp": 19.835
       }
@@ -30,6 +25,6 @@
   },
   "summary": {
     "total_boxes": 1,
-    "total_items": 5
+    "total_items": 4
   }
 }

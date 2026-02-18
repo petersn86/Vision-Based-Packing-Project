@@ -59,6 +59,8 @@ UNCERTAIN_YOLO_LABELS = {
     "microwave", "tv", "laptop", "cup", "vase", "bowl",
     "toothbrush", "hair drier", "scissors",  # Often misidentified tools
     "knife", "fork", "spoon",                # Cutlery often misidentified
+    "bed", "couch", "sofa", "bench",        # Furniture too large for boxes
+    "dining table", "desk", "chair",         # More furniture
 }
 
 # ------------------ Logging Setup ----------------- #
@@ -380,6 +382,22 @@ def main(videoPath=None):
                             )
                             break
 
+                # ---- Furniture rejection (cached path) ----
+                # Even for cached labels, reject furniture inside boxes
+                furniture_labels = {'bed', 'couch', 'sofa', 'desk', 'dining table'}
+                if refined_label.lower().strip() in furniture_labels and entry_detected and box_id:
+                    logger.info(
+                        f"[PLAUSIBILITY] Discarded cached track: '{refined_label}' "
+                        f"cannot fit inside {box_id}"
+                    )
+                    csv_writer.writerow([
+                        frame_idx, f.get('filename'), timestamp,
+                        yoloLabel, confidence, refined_label,
+                        track_id, None, None,
+                        False, False, hand_detected
+                    ])
+                    continue
+
                 if entry_enabled and not entry_detected:
                     csv_writer.writerow([
                         frame_idx, f.get('filename'), timestamp,
@@ -493,6 +511,23 @@ def main(videoPath=None):
                             False, False, hand_detected
                         ])
                         continue
+                    
+                    # ---- Extra check: reject furniture detections inside boxes ----
+                    # Beds, couches, etc. cannot physically fit inside packing boxes
+                    furniture_labels = {'bed', 'couch', 'sofa', 'desk', 'dining table'}
+                    if refined_label.lower().strip() in furniture_labels and box_id:
+                        total_plausibility_discards += 1
+                        logger.info(
+                            f"[PLAUSIBILITY] Discarded: '{refined_label}' "
+                            f"cannot fit inside {box_id}"
+                        )
+                        csv_writer.writerow([
+                            frame_idx, f.get('filename'), timestamp,
+                            yoloLabel, confidence, refined_label,
+                            track_id, None, None,
+                            False, False, hand_detected
+                        ])
+                        continue
 
                     if config.get('output.save_cropped_images', True):
                         cv2.imwrite(
@@ -527,6 +562,25 @@ def main(videoPath=None):
                         f"[ENTRY] Frame {frame_idx}: "
                         f"Track#{track_id} '{refined_label}' in {box_id}"
                     )
+
+            # ---- Final furniture check (after both paths merge) ----
+            # Reject furniture that cannot fit in boxes
+            furniture_labels = {'bed', 'couch', 'sofa', 'desk', 'dining table'}
+            if (refined_label and 
+                refined_label.lower().strip() in furniture_labels and 
+                box_id and 
+                box_id != "GLOBAL"):
+                logger.info(
+                    f"[PLAUSIBILITY] Blocked '{refined_label}' from registry - "
+                    f"furniture cannot fit inside {box_id}"
+                )
+                csv_writer.writerow([
+                    frame_idx, f.get('filename'), timestamp,
+                    yoloLabel, confidence, refined_label,
+                    track_id, None, None,
+                    False, False, hand_detected
+                ])
+                continue
 
             # ---- Registry deduplication (uses refined label) ----
             instance_id, is_new_item = registry.register_entry(

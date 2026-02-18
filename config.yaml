@@ -29,11 +29,25 @@ detection:
   ignore_labels:
     - "person"
     - "people"
+    - "refrigerator"  # Always false positive in packing boxes
+    - "microwave"     # Also too large for boxes
+    - "oven"
 
 # Plausibility Filter
 plausibility_filter:
   enabled: true
-  thresholds: {}
+  thresholds:
+    # Furniture (too large to fit in packing boxes)
+    # Very high thresholds since from above these would fill entire frame
+    bed: 0.95           # Bed from above = entire frame
+    couch: 0.80         # Couch from above = most of frame
+    sofa: 0.80          # Same as couch
+    bench: 0.70         # Bench still large
+    chair: 0.50         # Chair could be smaller but still sizable
+    desk: 0.75          # Desk from above = large surface
+    dining table: 0.80  # Table from above = large surface
+    # Already in plausibility_filter.py defaults:
+    # refrigerator: 0.60, microwave: 0.40, oven: 0.50, etc.
 
 # LLaMA Vision Settings
 llama:

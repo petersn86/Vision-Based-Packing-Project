@@ -120,6 +120,12 @@ class ItemRegistry:
                 'toilet paper', 'toilet roll', 'paper roll', 'roll',
                 'tp', 'bathroom tissue',
             },
+            'bag': {
+                'bag', 'handbag', 'purse', 'suitcase', 'luggage',
+                'backpack', 'duffel bag', 'tote bag', 'gym bag',
+                'messenger bag', 'briefcase', 'carry-on', 'travel bag',
+                'duffel', 'tote', 'shoulder bag', 'crossbody bag',
+            },
         }
 
     # ==========================================================
