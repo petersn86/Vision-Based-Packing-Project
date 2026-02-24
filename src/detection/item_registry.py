@@ -1,9 +1,10 @@
 ##############################################
-# SAFE + COMPLETE ITEM REGISTRY
+# IMPROVED ITEM REGISTRY - Fixes label drift
 ##############################################
 
 from typing import Dict, List, Optional, Tuple
 from collections import defaultdict
+from difflib import SequenceMatcher
 import logging
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,7 @@ class ItemRegistry:
 
     def __init__(self,
                  same_item_window: int = 20,
-                 label_similarity_threshold: float = 0.3):
+                 label_similarity_threshold: float = 0.5):  # RAISED from 0.3
 
         self.same_item_window = same_item_window
         self.label_similarity_threshold = label_similarity_threshold
@@ -69,6 +70,63 @@ class ItemRegistry:
         self._instances: Dict[int, ItemInstance] = {}
         self._track_to_instance: Dict[int, int] = {}
         self._next_id = 1
+
+        # Category-based synonyms for semantic matching
+        self._synonyms = {
+            'bottle': {
+                'bottle', 'water bottle', 'hand sanitizer', 'hand soap',
+                'soap bottle', 'lotion bottle', 'shampoo bottle', 'sanitizer',
+                'body wash', 'dish soap', 'cleaning spray', 'spray bottle'
+            },
+            'calculator': {
+                'calculator', 'calc', 'adding machine',
+                'phone', 'smartphone', 'cell phone', 'mobile phone', 'cellphone',
+                'iphone', 'android', 'mobile', 'telephone',
+                'remote', 'remote control'  # YOLO often confuses these
+            },
+            'book': {
+                'book', 'notebook', 'journal', 'textbook', 'novel', 'diary',
+                'planner', 'agenda', 'notepad'
+            },
+            'remote': {'remote', 'remote control', 'tv remote', 'controller'},
+            'pen': {'pen', 'ballpoint', 'marker', 'highlighter', 'sharpie'},
+            'scissors': {'scissors', 'shears', 'snips'},
+            'tape': {
+                'tape', 'duct tape', 'masking tape', 'packing tape',
+                'scotch tape', 'adhesive tape'
+            },
+            'charger': {
+                'charger', 'phone charger', 'cable', 'charging cable',
+                'power cord', 'usb cable', 'adapter'
+            },
+            'headphones': {
+                'headphones', 'earbuds', 'earphones', 'airpods', 'headset'
+            },
+            'glasses': {
+                'glasses', 'eyeglasses', 'sunglasses', 'spectacles',
+                'reading glasses'
+            },
+            'watch': {'watch', 'wristwatch', 'smartwatch', 'timepiece'},
+            'wallet': {'wallet', 'purse', 'billfold', 'cardholder'},
+            'tissue box': {
+                'tissue box', 'tissue', 'kleenex', 'tissues',
+                'tissue dispenser', 'facial tissue',
+            },
+            'screwdriver': {
+                'screwdriver', 'screw driver', 'flathead', 'phillips',
+                'phillips head', 'flathead screwdriver', 'tool',
+            },
+            'toilet paper': {
+                'toilet paper', 'toilet roll', 'paper roll', 'roll',
+                'tp', 'bathroom tissue',
+            },
+            'bag': {
+                'bag', 'handbag', 'purse', 'suitcase', 'luggage',
+                'backpack', 'duffel bag', 'tote bag', 'gym bag',
+                'messenger bag', 'briefcase', 'carry-on', 'travel bag',
+                'duffel', 'tote', 'shoulder bag', 'crossbody bag',
+            },
+        }
 
     # ==========================================================
     # PUBLIC API
@@ -85,7 +143,7 @@ class ItemRegistry:
 
         yolo_lower = yolo_label.lower().strip()
 
-        # Fast path
+        # Fast path - track already registered
         if track_id in self._track_to_instance:
             iid = self._track_to_instance[track_id]
             inst = self._instances.get(iid)
@@ -93,8 +151,8 @@ class ItemRegistry:
                 inst.update(track_id, frame, timestamp)
                 return iid, False
 
-        # Refined-label matching first
-        existing = self._find_matching_instance(
+        # IMPROVED: Try semantic matching on refined label first
+        existing = self._find_matching_instance_semantic(
             refined_label, box_id, frame
         )
 
@@ -105,11 +163,11 @@ class ItemRegistry:
             )
 
             if candidate:
-
                 if is_uncertain:
                     existing = candidate
                 else:
-                    sim = self._token_similarity(
+                    # Use semantic similarity instead of token similarity
+                    sim = self._semantic_similarity(
                         refined_label,
                         candidate.refined_label
                     )
@@ -119,9 +177,15 @@ class ItemRegistry:
         if existing:
             existing.update(track_id, frame, timestamp)
             self._track_to_instance[track_id] = existing.instance_id
+            
+            logger.info(
+                f"[REGISTRY] MERGED #{existing.instance_id}: '{refined_label}' "
+                f"matched '{existing.refined_label}' (sim={self._semantic_similarity(refined_label, existing.refined_label):.2f})"
+            )
+            
             return existing.instance_id, False
 
-        # Create new
+        # Create new instance
         iid = self._next_id
         self._next_id += 1
 
@@ -142,7 +206,7 @@ class ItemRegistry:
         return iid, True
 
     # ==========================================================
-    # EXPORT / ACCESS METHODS (required by main.py)
+    # EXPORT / ACCESS METHODS
     # ==========================================================
 
     def get_unique_labels(self) -> List[str]:
@@ -188,14 +252,116 @@ class ItemRegistry:
         }
 
     # ==========================================================
-    # MATCHING LOGIC
+    # IMPROVED MATCHING LOGIC - Semantic similarity
     # ==========================================================
+
+    def _semantic_similarity(self, label1: str, label2: str) -> float:
+        """
+        Compute semantic similarity between labels using multiple strategies.
+        
+        Returns score between 0.0 and 1.0:
+        - 1.0 = exact match
+        - 0.8 = same category (e.g., both are bottles)
+        - 0.7 = substring containment
+        - 0.0-0.5 = token overlap or string similarity
+        """
+        l1 = label1.lower().strip()
+        l2 = label2.lower().strip()
+        
+        # Exact match
+        if l1 == l2:
+            return 1.0
+        
+        # Category synonyms - HIGH priority match
+        # If both labels belong to the same category, they're the same item
+        for category, words in self._synonyms.items():
+            contains1 = any(w in l1 for w in words)
+            contains2 = any(w in l2 for w in words)
+            
+            if contains1 and contains2:
+                logger.debug(
+                    f"[SIMILARITY] '{label1}' & '{label2}' both in '{category}' category → 0.85"
+                )
+                return 0.85  # High similarity for same category
+        
+        # Substring containment
+        # "Water Bottle" contains "Bottle", or vice versa
+        if l1 in l2 or l2 in l1:
+            logger.debug(
+                f"[SIMILARITY] '{label1}' substring of '{label2}' → 0.7"
+            )
+            return 0.7
+        
+        # Token overlap (original Jaccard similarity)
+        tokens1 = set(l1.split())
+        tokens2 = set(l2.split())
+        if tokens1 and tokens2:
+            intersection = tokens1 & tokens2
+            union = tokens1 | tokens2
+            jaccard = len(intersection) / len(union)
+            if jaccard > 0:
+                logger.debug(
+                    f"[SIMILARITY] '{label1}' & '{label2}' token overlap → {jaccard:.2f}"
+                )
+                return jaccard
+        
+        # String similarity (Levenshtein-like via difflib)
+        # Catches typos and close matches
+        ratio = SequenceMatcher(None, l1, l2).ratio()
+        if ratio > 0.6:  # Only count if reasonably similar
+            logger.debug(
+                f"[SIMILARITY] '{label1}' & '{label2}' string match → {ratio*0.5:.2f}"
+            )
+            return ratio * 0.5  # Scale down to avoid false positives
+        
+        return 0.0
+
+    def _find_matching_instance_semantic(self,
+                                          refined_label: str,
+                                          box_id: str,
+                                          current_frame: int) -> Optional[ItemInstance]:
+        """
+        Find matching instance using SEMANTIC similarity instead of exact match.
+        
+        This is the key change that prevents label drift.
+        """
+        best = None
+        best_score = 0.0
+        best_diff = self.same_item_window + 1
+
+        for inst in self._instances.values():
+            if inst.status != "in_box":
+                continue
+            if inst.box_id != box_id:
+                continue
+
+            diff = current_frame - inst.last_frame
+            if not (0 <= diff <= self.same_item_window):
+                continue
+
+            # Use semantic similarity instead of exact string match
+            similarity = self._semantic_similarity(refined_label, inst.refined_label)
+            
+            if similarity >= self.label_similarity_threshold:
+                # Prefer more recent detections if similarity is equal
+                if similarity > best_score or (similarity == best_score and diff < best_diff):
+                    best_score = similarity
+                    best_diff = diff
+                    best = inst
+
+        if best:
+            logger.debug(
+                f"[MATCH] '{refined_label}' → instance #{best.instance_id} "
+                f"'{best.refined_label}' (score={best_score:.2f}, age={best_diff})"
+            )
+
+        return best
 
     def _find_same_yolo_origin(self,
                                 yolo_lower: str,
                                 box_id: str,
                                 current_frame: int) -> Optional[ItemInstance]:
-
+        """Find instance with same YOLO origin (fallback matcher)"""
         best = None
         best_diff = self.same_item_window + 1
 
@@ -214,38 +380,3 @@ class ItemRegistry:
                     best = inst
 
         return best
-
-    def _find_matching_instance(self,
-                                 refined_label: str,
-                                 box_id: str,
-                                 current_frame: int) -> Optional[ItemInstance]:
-
-        label_lower = refined_label.lower().strip()
-
-        best = None
-        best_diff = self.same_item_window + 1
-
-        for inst in self._instances.values():
-            if inst.status != "in_box":
-                continue
-            if inst.box_id != box_id:
-                continue
-
-            diff = current_frame - inst.last_frame
-            if not (0 <= diff <= self.same_item_window):
-                continue
-
-            if inst.refined_label.lower().strip() == label_lower:
-                if diff < best_diff:
-                    best_diff = diff
-                    best = inst
-
-        return best
-
-    @staticmethod
-    def _token_similarity(a: str, b: str) -> float:
-        tokens_a = set(a.lower().split())
-        tokens_b = set(b.lower().split())
-        if not tokens_a or not tokens_b:
-            return 0.0
-        return len(tokens_a & tokens_b) / len(tokens_a | tokens_b)

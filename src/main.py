@@ -11,6 +11,8 @@
 #
 # Item deduplication is handled by ItemRegistry (stable instance IDs).
 # Box identity is handled by BoxTracker (stable box IDs across frames).
+#
+# MODIFIED: Added image preprocessing for YOLO (not LLaMA)
 ###############################################################################
 
 from video_processor                import extractFrames
@@ -24,7 +26,16 @@ from detection.entry_detector       import EntryDetector
 from detection.plausibility_filter  import PlausibilityFilter
 from detection.item_registry        import ItemRegistry
 from detection.hand_detector        import HandDetector
+from detection.image_preprocessor   import enhance_for_detection  # NEW: Image preprocessing
 import sys, os
+import io
+
+# ---- Windows UTF-8 encoding fix ----
+# Set environment variable only - do NOT wrap sys.stdout here.
+# Wrapping stdout twice (here + in app.py thread) corrupts file handles.
+os.environ["PYTHONUTF8"] = "1"
+os.environ["PYTHONIOENCODING"] = "utf-8"
+
 sys.path.insert(0, '..')
 from config_loader                  import get_config
 import cv2
@@ -46,18 +57,15 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 UNCERTAIN_YOLO_LABELS = {
     "bottle", "cell phone", "remote", "refrigerator",
     "microwave", "tv", "laptop", "cup", "vase", "bowl",
+    "toothbrush", "hair drier", "scissors",  # Often misidentified tools
+    "knife", "fork", "spoon",                # Cutlery often misidentified
+    "bed", "couch", "sofa", "bench",        # Furniture too large for boxes
+    "dining table", "desk", "chair",         # More furniture
 }
 
 # ------------------ Logging Setup ----------------- #
 def setup_logging(config):
-    if sys.platform == 'win32':
-        try:
-            if hasattr(sys.stdout, 'reconfigure'):
-                sys.stdout.reconfigure(encoding='utf-8')
-            if hasattr(sys.stderr, 'reconfigure'):
-                sys.stderr.reconfigure(encoding='utf-8')
-        except Exception:
-            pass
+    # UTF-8 is handled via PYTHONUTF8 env var at startup - no stdout reconfiguring needed
 
     log_level      = getattr(logging, config.get('logging.level', 'INFO'))
     log_file       = config.get('logging.log_file', 'app.log')
@@ -251,6 +259,7 @@ def main(videoPath=None):
     label_cache: dict = {}
 
     logger.info("Running detection pipeline...")
+    logger.info("Image preprocessing: ENABLED for YOLO (standard preset)")
 
     # ---------------- Main Frame Loop ---------------- #
     for f in framesData:
@@ -259,12 +268,19 @@ def main(videoPath=None):
         timestamp        = meta_map.get(f.get('filename'), None)
         frame_h, frame_w = originalFrame.shape[:2]
 
-        # ---- Hand detection (runs every frame) ----
+        # ============================================
+        # PREPROCESS FOR YOLO ONLY (NOT LLAMA)
+        # ============================================
+        yoloFrame = enhance_for_detection(originalFrame, preset='standard')
+        # yoloFrame is enhanced for better YOLO detection
+        # originalFrame stays natural for LLaMA crops
+
+        # ---- Hand detection (uses original frame) ----
         hand_detected = hand_detector.detect(originalFrame)
 
-        # ---- YOLO detections ----
+        # ---- YOLO detections (uses enhanced frame) ----
         detections = detector.detectObjects(
-            originalFrame,
+            yoloFrame,  # ← Enhanced frame for better YOLO detection
             confThresh=conf_threshold,
             boxConfThresh=box_conf_threshold
         )
@@ -308,7 +324,7 @@ def main(videoPath=None):
         else:
             tracked_objects = [{**det, 'track_id': None} for det in item_detections]
 
-        # ---- Video annotation ----
+        # ---- Video annotation (uses original frame) ----
         if video_output_enabled:
             detections_per_frame[frame_idx] = {
                 'detections': tracked_objects + [
@@ -366,6 +382,22 @@ def main(videoPath=None):
                             )
                             break
 
+                # ---- Furniture rejection (cached path) ----
+                # Even for cached labels, reject furniture inside boxes
+                furniture_labels = {'bed', 'couch', 'sofa', 'desk', 'dining table'}
+                if refined_label.lower().strip() in furniture_labels and entry_detected and box_id:
+                    logger.info(
+                        f"[PLAUSIBILITY] Discarded cached track: '{refined_label}' "
+                        f"cannot fit inside {box_id}"
+                    )
+                    csv_writer.writerow([
+                        frame_idx, f.get('filename'), timestamp,
+                        yoloLabel, confidence, refined_label,
+                        track_id, None, None,
+                        False, False, hand_detected
+                    ])
+                    continue
+
                 if entry_enabled and not entry_detected:
                     csv_writer.writerow([
                         frame_idx, f.get('filename'), timestamp,
@@ -415,21 +447,50 @@ def main(videoPath=None):
 
                 # Item IS in a box — now worth running LLaMA
                 x1, y1, x2, y2 = bbox
-                crop = originalFrame[y1:y2, x1:x2]
+                crop = originalFrame[y1:y2, x1:x2]  # ← CRITICAL: Crop from ORIGINAL frame for LLaMA!
 
                 if crop.size == 0:
                     logger.warning(f"Empty crop for '{yoloLabel}' frame {frame_idx}")
                     refined_label = yoloLabel
                 else:
-                    # Pass confirmed labels for this box as context
-                    box_context = registry.get_unique_labels_for_box(
+                    # Get box context
+                    box_context_full = registry.get_unique_labels_for_box(
                         box_id or "GLOBAL"
                     )
+                    
+                    # CRITICAL FIX: Don't use box context if YOLO label is uncertain
+                    # Uncertain labels often lead LLaMA to incorrectly match against box items
+                    # (e.g., screwdriver misidentified as bottle because "Bottle" is in context)
+                    uncertain_yolo = yoloLabel.lower().strip() in UNCERTAIN_YOLO_LABELS
+                    
+                    if uncertain_yolo:
+                        # YOLO is unreliable - let LLaMA decide WITHOUT bias
+                        box_context = None
+                        logger.debug(
+                            f"[UNCERTAIN YOLO] '{yoloLabel}' - disabling box context "
+                            f"for unbiased LLaMA analysis"
+                        )
+                    else:
+                        # YOLO is reliable - use box context for consistency
+                        box_context = box_context_full
+                    
                     if reasoner:
                         refined_label = reasoner.refineDetection(
                             crop, yoloLabel, box_context=box_context
                         )
                     refined_label = refined_label or yoloLabel
+                    
+                    # SAFE NORMALIZATION: Only normalize if LLaMA confirmed YOLO's label
+                    # This prevents "screwdriver" (LLaMA correction) from being normalized to "bottle"
+                    # But allows "bottle" → "Bottle" normalization for consistency
+                    if reasoner and refined_label.lower().strip() == yoloLabel.lower().strip():
+                        original_label = refined_label
+                        refined_label = reasoner.normalize_label(refined_label)
+                        if original_label != refined_label:
+                            logger.info(
+                                f"[NORMALIZE] '{original_label}' → '{refined_label}' "
+                                f"(LLaMA confirmed YOLO)"
+                            )
 
                     # ---- Plausibility check on refined label ----
                     _, discards = plausibility_filter.filter(
@@ -442,6 +503,23 @@ def main(videoPath=None):
                         logger.info(
                             f"[PLAUSIBILITY] Discarded: YOLO='{yoloLabel}' "
                             f"-> LLaMA='{refined_label}' (bbox too small)"
+                        )
+                        csv_writer.writerow([
+                            frame_idx, f.get('filename'), timestamp,
+                            yoloLabel, confidence, refined_label,
+                            track_id, None, None,
+                            False, False, hand_detected
+                        ])
+                        continue
+                    
+                    # ---- Extra check: reject furniture detections inside boxes ----
+                    # Beds, couches, etc. cannot physically fit inside packing boxes
+                    furniture_labels = {'bed', 'couch', 'sofa', 'desk', 'dining table'}
+                    if refined_label.lower().strip() in furniture_labels and box_id:
+                        total_plausibility_discards += 1
+                        logger.info(
+                            f"[PLAUSIBILITY] Discarded: '{refined_label}' "
+                            f"cannot fit inside {box_id}"
                         )
                         csv_writer.writerow([
                             frame_idx, f.get('filename'), timestamp,
@@ -485,6 +563,25 @@ def main(videoPath=None):
                         f"Track#{track_id} '{refined_label}' in {box_id}"
                     )
 
+            # ---- Final furniture check (after both paths merge) ----
+            # Reject furniture that cannot fit in boxes
+            furniture_labels = {'bed', 'couch', 'sofa', 'desk', 'dining table'}
+            if (refined_label and 
+                refined_label.lower().strip() in furniture_labels and 
+                box_id and 
+                box_id != "GLOBAL"):
+                logger.info(
+                    f"[PLAUSIBILITY] Blocked '{refined_label}' from registry - "
+                    f"furniture cannot fit inside {box_id}"
+                )
+                csv_writer.writerow([
+                    frame_idx, f.get('filename'), timestamp,
+                    yoloLabel, confidence, refined_label,
+                    track_id, None, None,
+                    False, False, hand_detected
+                ])
+                continue
+
             # ---- Registry deduplication (uses refined label) ----
             instance_id, is_new_item = registry.register_entry(
                 track_id=track_id if track_id is not None else -1,
@@ -524,7 +621,7 @@ def main(videoPath=None):
             ts = meta_map.get(fd.get('filename'))
             frame_data = detections_per_frame.get(fi, {})
             annotator.add_frame(
-                fd['frame'],
+                fd['frame'],  # ← Use original frame for video output
                 frame_data.get('detections', []),
                 fi,
                 ts,

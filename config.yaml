@@ -23,21 +23,31 @@ detection:
     - "box"
     - "carton"
     - "cardboard"
-  confidence_threshold: 0.60
+  confidence_threshold: 0.55        # Raised from 0.40 (was causing too much noise)
+                                     # Lower than original 0.60 to catch screwdriver
   box_confidence_threshold: 0.35
   ignore_labels:
     - "person"
     - "people"
+    - "refrigerator"  # Always false positive in packing boxes
+    - "microwave"     # Also too large for boxes
+    - "oven"
 
 # Plausibility Filter
-# Discards detections whose label implies a large object but whose bbox
-# is too small relative to the frame to plausibly be that object.
 plausibility_filter:
   enabled: true
-  thresholds: {}
-  # Examples:
-  #   microwave: 0.30
-  #   refrigerator: 0.70
+  thresholds:
+    # Furniture (too large to fit in packing boxes)
+    # Very high thresholds since from above these would fill entire frame
+    bed: 0.95           # Bed from above = entire frame
+    couch: 0.80         # Couch from above = most of frame
+    sofa: 0.80          # Same as couch
+    bench: 0.70         # Bench still large
+    chair: 0.50         # Chair could be smaller but still sizable
+    desk: 0.75          # Desk from above = large surface
+    dining table: 0.80  # Table from above = large surface
+    # Already in plausibility_filter.py defaults:
+    # refrigerator: 0.60, microwave: 0.40, oven: 0.50, etc.
 
 # LLaMA Vision Settings
 llama:
@@ -54,41 +64,18 @@ tracking:
   match_thresh: 0.7
   second_match_thresh: 0.4
   reid_enabled: true
-  # reid_thresh: cosine similarity threshold for re-identifying a lost object.
-  # 0.50 works well with MobileNetV2 embeddings for held/moving items.
-  # Raise toward 0.70 if different objects are being incorrectly merged.
-  # Lower toward 0.35 if the same object keeps getting new IDs.
   reid_thresh: 0.50
   reid_buffer: 150
 
 # Box Tracker
-# Assigns stable IDs to detected boxes across frames so that
-# ItemRegistry can correctly deduplicate items by (label + box_id).
-# Without this, box_id changes every frame and every detection looks
-# like a new item to the registry.
 box_tracker:
-  # Minimum IOU between two box detections to consider them the same
-  # physical box. 0.3 is permissive enough to handle slight camera shake.
   iou_threshold: 0.3
-  # Frames a box can go undetected before its ID is retired.
-  # At 0.5s interval: 30 frames = 15 seconds.
   max_age: 30
 
 # Item Registry
-# Deduplicates items by (label + box_id + recency) rather than track ID.
-# This means a Dial bottle that gets 6 different track IDs still only
-# appears once in the final item list.
-# Item Registry
 item_registry:
-  # Frames within which a re-detection of the same label+box is considered
-  # the same physical item. At 0.5s interval: 20 frames = 10 seconds.
   same_item_window: 20
-
-  # Minimum Jaccard token similarity for two labels to be treated as the
-  # same item (e.g. "Hand Sanitizer" vs "Hand Soap" share "hand" -> 0.33).
-  # Raise toward 0.6 if unrelated items are merging incorrectly.
-  # Lower toward 0.2 if the same item keeps splitting into new instances.
-  label_similarity_threshold: 0.3
+  label_similarity_threshold: 0.5   # Raised from 0.3 for better merging
 
 # QR Code Detection
 qr_detection:

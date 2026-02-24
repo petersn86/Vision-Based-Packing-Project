@@ -7,6 +7,9 @@
 # Utility module for loading and accessing
 # project configuration from config.yaml
 #
+# FIXED: Added encoding='utf-8' to config file open
+#        to prevent Windows charmap errors.
+#
 ##############################################
 
 import yaml
@@ -24,7 +27,6 @@ class Config:
         Args:
             config_path: Path to config.yaml file
         """
-        # If running from src/, look in parent directory for config
         from pathlib import Path
         config_file = Path(config_path)
         
@@ -33,7 +35,6 @@ class Config:
             parent_config = Path('..') / config_path
             if parent_config.exists():
                 config_file = parent_config
-            # Try current directory
             elif Path.cwd() / config_path != config_file:
                 config_file = Path.cwd() / config_path
         
@@ -48,7 +49,8 @@ class Config:
                 f"Please create a config.yaml file in the project root."
             )
         
-        with open(self.config_path, 'r') as f:
+        # ---- FIX: encoding='utf-8' prevents Windows charmap error ----
+        with open(self.config_path, 'r', encoding='utf-8') as f:
             config = yaml.safe_load(f)
         
         # Validate required sections

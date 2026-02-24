@@ -3,15 +3,12 @@
 # @Contributor(s): Peter Nolan
 # @Document: 'frame_reasoner.py'
 #
-# Description:
-# This module uses Llama Vision to analyze an image crop
-# from YOLO. It verifies or refines the YOLO detections
-# and returns a single confirmed label.
+# IMPROVED VERSION - Fixes label drift problem
 #
-# Box context: if a list of already-confirmed labels for
-# the current box is provided, they are injected into the
-# prompt so LLaMA anchors its response against known items,
-# reducing label drift across frames for the same object.
+# Changes:
+# 1. Better LLaMA prompt that encourages label reuse
+# 2. Added hierarchical label normalization
+# 3. More explicit instructions about matching existing items
 #
 ########################################################
 
@@ -26,6 +23,57 @@ BOX_LIKE_LABELS = {
     "container", "containers", "crate", "crates", "bin", "bins",
     "package", "packages", "packaging"
 }
+
+# Hierarchical label mapping - maps specific labels to generic categories
+# This reduces label drift by normalizing related items to the same name
+LABEL_HIERARCHY = {
+    'Bottle': [
+        'bottle', 'water bottle', 'hand sanitizer', 'hand soap', 
+        'soap bottle', 'lotion bottle', 'shampoo bottle', 'sanitizer',
+        'body wash', 'dish soap', 'cleaning spray', 'spray bottle'
+    ],
+    'Phone': [
+        'phone', 'smartphone', 'cell phone', 'mobile phone', 'cellphone',
+        'iphone', 'android', 'mobile', 'telephone'
+    ],
+    'Calculator': [
+        'calculator', 'calc', 'adding machine'
+    ],
+    'Book': [
+        'book', 'notebook', 'journal', 'textbook', 'novel', 'diary',
+        'planner', 'agenda', 'notepad'
+    ],
+    'Remote': [
+        'remote', 'remote control', 'tv remote', 'controller'
+    ],
+    'Pen': [
+        'pen', 'ballpoint', 'marker', 'highlighter', 'sharpie'
+    ],
+    'Scissors': [
+        'scissors', 'shears', 'snips'
+    ],
+    'Tape': [
+        'tape', 'duct tape', 'masking tape', 'packing tape', 'scotch tape',
+        'adhesive tape'
+    ],
+    'Charger': [
+        'charger', 'phone charger', 'cable', 'charging cable', 'power cord',
+        'usb cable', 'adapter'
+    ],
+    'Headphones': [
+        'headphones', 'earbuds', 'earphones', 'airpods', 'headset'
+    ],
+    'Glasses': [
+        'glasses', 'eyeglasses', 'sunglasses', 'spectacles', 'reading glasses'
+    ],
+    'Watch': [
+        'watch', 'wristwatch', 'smartwatch', 'timepiece'
+    ],
+    'Wallet': [
+        'wallet', 'purse', 'billfold', 'cardholder'
+    ],
+}
+
 
 class FrameReasoner:
 
@@ -45,42 +93,119 @@ class FrameReasoner:
             print(f"Ollama error: {e}")
 
     # --------------------------------------------------------------
-    # Build prompt, optionally injecting confirmed box context
+    # Build prompt with strong emphasis on reusing existing labels
     # --------------------------------------------------------------
-    def buildPrompt(self, box_context: List[str] = None) -> str:
+    def buildPrompt(self, yolo_label: str, box_context: List[str] = None) -> str:
         """
-        Build the LLaMA prompt.
+        Build the LLaMA prompt with emphasis on label consistency.
 
         Args:
+            yolo_label: The YOLO detection label
             box_context: List of refined labels already confirmed in this box.
-                         If provided, LLaMA is asked to match against them
-                         before inventing a new label, reducing drift where
-                         the same object gets slightly different names across
-                         frames (e.g. "Hand Sanitizer" vs "Hand Soap").
+                         LLaMA is strongly encouraged to reuse these labels
+                         for similar objects to prevent duplicate entries.
         """
         context_line = ""
         if box_context:
+            formatted_items = '\n'.join(f'  {i+1}. {item}' for i, item in enumerate(box_context))
             context_line = (
-                f"Items already confirmed in this box: "
-                f"{', '.join(box_context)}\n"
-                f"If this object matches one of those exactly, return that "
-                f"exact name. Otherwise return the correct name.\n\n"
+                f"══════════════════════════════════════\n"
+                f"ITEMS ALREADY IN THIS BOX:\n"
+                f"{formatted_items}\n"
+                f"══════════════════════════════════════\n\n"
+                f"⚠️  IMPORTANT:\n"
+                f"If this object is CLEARLY the same item as something in the list,\n"
+                f"return that exact name for consistency.\n\n"
+                f"However, if this is a DIFFERENT object, return the correct new name,\n"
+                f"even if YOLO thinks it's the same as something in the list.\n\n"
+                f"Examples:\n"
+                f"  • You see another water bottle, 'Bottle' is in list → return 'Bottle' ✓\n"
+                f"  • You see a screwdriver, YOLO says 'bottle', 'Bottle' is in list → return 'Screwdriver' ✓\n"
+                f"  • You see a phone, YOLO says 'cell phone', 'Calculator' is in list → return 'Phone' ✓\n\n"
+                f"Trust your visual analysis FIRST. Only reuse names when truly the same.\n\n"
             )
 
         return (
-            "You are an object identifier. Identify the object in this image.\n\n"
-            "YOLO detected: '{yolo_label}'\n\n"
+            "You are an object identifier for a packing inventory system.\n"
+            "Your job: identify what is in this image with a SHORT, CONSISTENT label.\n\n"
             f"{context_line}"
+            f"YOLO detected: '{yolo_label}'\n\n"
             "RULES:\n"
             "1. Return ONLY the object name (1-3 words max)\n"
-            "2. If YOLO is correct, return that exact name\n"
-            "3. If YOLO is wrong, return the correct name\n"
-            "4. NO explanations, NO sentences, NO extra text\n"
-            "5. If unclear or not a packable item, return: none\n\n"
-            "GOOD examples: backpack, laptop, water bottle, book\n"
-            "BAD examples: The object is a backpack, I think this is...\n\n"
-            "Object name (one word or short phrase only):"
+            "2. If object matches an existing box item AND is truly the same → return THAT NAME exactly\n"
+            "3. If YOLO is correct and item not in box yet → return YOLO label\n"
+            "4. If YOLO is wrong → return the correct name (ignore YOLO!)\n"
+            "5. NO explanations, NO sentences, NO extra text\n"
+            "6. If unclear or not packable → return: none\n\n"
+            "IMPORTANT DISTINCTIONS:\n"
+            "  • Screwdriver ≠ Bottle (even if cylindrical handle)\n"
+            "  • Calculator ≠ Phone (different devices)\n"
+            "  • Remote ≠ Phone (different functions)\n"
+            "  • Tool handle ≠ Bottle (tools are not bottles)\n\n"
+            "GOOD RESPONSES: Bottle, Phone, Book, Calculator, Apple, Screwdriver, Scissors\n"
+            "BAD RESPONSES: The bottle appears to be, I think this is, It looks like\n\n"
+            "Object name:"
         )
+
+    # --------------------------------------------------------------
+    # Label normalization - maps variations to canonical forms
+    # --------------------------------------------------------------
+    def normalize_label(self, label: str) -> str:
+        """
+        Normalize label to canonical form to reduce drift.
+        
+        Maps specific variations (e.g., "Hand Sanitizer", "Water Bottle") 
+        to generic categories (e.g., "Bottle") to prevent duplicate entries.
+        
+        SAFE VERSION: Only normalizes exact matches or clear word patterns
+        to prevent "screwdriver" from becoming "bottle".
+        
+        Args:
+            label: Raw label from LLaMA
+            
+        Returns:
+            Normalized label (generic category if matched, else original)
+        """
+        if not label:
+            return label
+            
+        label_lower = label.lower().strip()
+        
+        # Check each category
+        for generic, specifics in LABEL_HIERARCHY.items():
+            for specific in specifics:
+                # SAFE MATCHING: Only normalize if it's truly a variant
+                
+                # Method 1: Exact match
+                if label_lower == specific:
+                    print(f"[NORMALIZE] '{label}' → '{generic}' (exact match: {specific})")
+                    return generic
+                
+                # Method 2: Multi-word match - all words from specific must be in label
+                # "hand sanitizer" matches "hand" in specifics
+                # "screwdriver" does NOT match "bottle" (different words)
+                specific_words = set(specific.split())
+                label_words = set(label_lower.split())
+                
+                if specific_words and specific_words.issubset(label_words):
+                    print(f"[NORMALIZE] '{label}' → '{generic}' (word match: {specific})")
+                    return generic
+                
+                # Method 3: Safe suffix/prefix patterns
+                # "water bottle" ends with "bottle" → OK
+                # "screwdriver" contains "bottle" as substring → NOT OK
+                if len(specific.split()) == 1:  # Single word specific
+                    # Only match if specific is a complete word in label
+                    if f" {specific} " in f" {label_lower} ":
+                        print(f"[NORMALIZE] '{label}' → '{generic}' (word boundary: {specific})")
+                        return generic
+                    # Or at start/end
+                    if label_lower.startswith(specific + " ") or label_lower.endswith(" " + specific):
+                        print(f"[NORMALIZE] '{label}' → '{generic}' (edge word: {specific})")
+                        return generic
+        
+        # No match - keep original
+        return label
 
     # --------------------------------------------------------------
     # Check if a label refers to a box/container
@@ -162,7 +287,7 @@ class FrameReasoner:
         Args:
             image_crop:  Cropped BGR image of the detected object
             yolo_label:  Raw YOLO class label
-            box_context: Labels already confirmed in this box (for anchoring).
+            box_context: Labels already confirmed in this box (for consistency).
                          Pass registry.get_unique_labels_for_box(box_id) here.
 
         Returns:
@@ -176,7 +301,7 @@ class FrameReasoner:
             _, buffer = cv2.imencode('.jpg', image_crop)
             image_bytes = buffer.tobytes()
 
-            prompt_text = self.buildPrompt(box_context).format(yolo_label=yolo_label)
+            prompt_text = self.buildPrompt(yolo_label, box_context)
 
             messages = [
                 {
