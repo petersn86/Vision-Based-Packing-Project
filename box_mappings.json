@@ -4,27 +4,33 @@
       {
         "track_id": 0,
         "label": "Bottle",
-        "timestamp": 5.667
+        "timestamp": 5.667,
+        "status": "removed"
       },
       {
         "track_id": 7,
         "label": "Calculator",
-        "timestamp": 11.335
+        "timestamp": 11.335,
+        "status": "in_box"
       },
       {
         "track_id": 11,
         "label": "Apple",
-        "timestamp": 16.057
+        "timestamp": 16.057,
+        "status": "in_box"
       },
       {
         "track_id": 17,
         "label": "Screwdriver",
-        "timestamp": 19.835
+        "timestamp": 19.835,
+        "status": "in_box"
       }
     ]
   },
   "summary": {
     "total_boxes": 1,
-    "total_items": 4
+    "total_items": 4,
+    "items_in_box": 3,
+    "items_removed": 1
   }
 }

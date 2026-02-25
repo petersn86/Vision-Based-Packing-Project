@@ -7,7 +7,10 @@
       "label": "Bottle",
       "box_id": "BOX-001",
       "timestamp": 5.667,
-      "frame": 12
+      "frame": 12,
+      "status": "removed",
+      "exit_frame": 39,
+      "exit_ts": 18.419
     },
     {
       "instance_id": 2,
@@ -15,7 +18,10 @@
       "label": "Calculator",
       "box_id": "BOX-001",
       "timestamp": 11.335,
-      "frame": 24
+      "frame": 24,
+      "status": "in_box",
+      "exit_frame": null,
+      "exit_ts": null
     },
     {
       "instance_id": 3,
@@ -23,7 +29,10 @@
       "label": "Apple",
       "box_id": "BOX-001",
       "timestamp": 16.057,
-      "frame": 34
+      "frame": 34,
+      "status": "in_box",
+      "exit_frame": null,
+      "exit_ts": null
     },
     {
       "instance_id": 4,
@@ -31,7 +40,10 @@
       "label": "Screwdriver",
       "box_id": "BOX-001",
       "timestamp": 19.835,
-      "frame": 42
+      "frame": 42,
+      "status": "in_box",
+      "exit_frame": null,
+      "exit_ts": null
     }
   ]
 }

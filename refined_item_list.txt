@@ -1,4 +1,3 @@
 item 1: "Apple"
-item 2: "Bottle"
-item 3: "Calculator"
-item 4: "Screwdriver"
+item 2: "Calculator"
+item 3: "Screwdriver"

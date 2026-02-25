@@ -18,9 +18,9 @@
       "last_frame": 29,
       "first_ts": 5.667,
       "last_ts": 13.696,
-      "status": "in_box",
-      "exit_frame": null,
-      "exit_ts": null
+      "status": "removed",
+      "exit_frame": 39,
+      "exit_ts": 18.419
     },
     {
       "instance_id": 2,
@@ -96,9 +96,9 @@
         "last_frame": 29,
         "first_ts": 5.667,
         "last_ts": 13.696,
-        "status": "in_box",
-        "exit_frame": null,
-        "exit_ts": null
+        "status": "removed",
+        "exit_frame": 39,
+        "exit_ts": 18.419
       },
       {
         "instance_id": 2,
@@ -157,11 +157,10 @@
   },
   "summary": {
     "total_unique_items": 4,
-    "items_in_box": 4,
-    "items_removed": 0,
+    "items_in_box": 3,
+    "items_removed": 1,
     "unique_labels": [
       "Apple",
-      "Bottle",
       "Calculator",
       "Screwdriver"
     ]
