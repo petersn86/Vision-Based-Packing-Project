@@ -3,7 +3,7 @@
 
 # Video Processing Settings
 video:
-  frame_interval: 0.5
+  frame_interval: 1.0
   default_video: "data/videos/packing_video.mp4"
 
 # Directory Paths
@@ -89,6 +89,27 @@ entry_detection:
   exit_threshold: 1
   overlap_threshold: 0.20
   require_motion: false
+
+exit_detection:
+  enabled: true
+
+  # Stage 1 — hand overlap
+  hand_overlap_threshold: 0.50      # fraction of item bbox covered by a hand bbox
+
+  # Stage 2 — absence gates before LLaMA fires
+  absence_threshold: 5              # frames for HAND-FLAGGED items (fast path)
+                                     # At 2fps -> ~2.5 seconds after hand interaction
+  geometric_threshold: 25           # frames for NON-hand-flagged items (slow path)
+                                     # At 2fps -> ~12.5 seconds of continuous absence
+                                     # High intentionally -- YOLO drops stationary items often
+
+  # LLaMA verification
+  llama_verification: true
+
+  # Stale track eviction -- frames without YOLO detection before a track is
+  # evicted from confirmed_entries so absence counting can begin.
+  # Keep this HIGH to avoid reacting to normal YOLO dropout on still objects.
+  stale_threshold: 6               # At 2fps -> ~6 seconds of no YOLO detection            # At 2fps -> ~6 seconds of no YOLO detection
 
 # Output Settings
 output:

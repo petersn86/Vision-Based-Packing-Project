@@ -3,28 +3,46 @@
     "BOX-001": [
       {
         "track_id": 0,
-        "label": "Bottle",
-        "timestamp": 5.667
-      },
-      {
-        "track_id": 7,
-        "label": "Calculator",
-        "timestamp": 11.335
-      },
-      {
-        "track_id": 11,
         "label": "Apple",
-        "timestamp": 16.057
+        "timestamp": 1.958,
+        "status": "removed"
       },
       {
-        "track_id": 17,
-        "label": "Screwdriver",
-        "timestamp": 19.835
+        "track_id": 2,
+        "label": "Handbag",
+        "timestamp": 19.576,
+        "status": "removed"
+      },
+      {
+        "track_id": 3,
+        "label": "Sunglasses",
+        "timestamp": 21.534,
+        "status": "removed"
+      },
+      {
+        "track_id": 4,
+        "label": "Apple",
+        "timestamp": 30.343,
+        "status": "removed"
+      },
+      {
+        "track_id": 6,
+        "label": "Bottle",
+        "timestamp": 39.152,
+        "status": "removed"
+      },
+      {
+        "track_id": 8,
+        "label": "Scissors",
+        "timestamp": 44.046,
+        "status": "removed"
       }
     ]
   },
   "summary": {
     "total_boxes": 1,
-    "total_items": 4
+    "total_items": 6,
+    "items_in_box": 0,
+    "items_removed": 6
   }
 }

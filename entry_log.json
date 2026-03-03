@@ -1,37 +1,71 @@
 {
-  "total_entries": 4,
+  "total_entries": 6,
   "entries": [
     {
       "instance_id": 1,
       "track_id": 0,
-      "label": "Bottle",
+      "label": "Apple",
       "box_id": "BOX-001",
-      "timestamp": 5.667,
-      "frame": 12
+      "timestamp": 1.958,
+      "frame": 2,
+      "status": "removed",
+      "exit_frame": 15,
+      "exit_ts": 14.682
     },
     {
       "instance_id": 2,
-      "track_id": 7,
-      "label": "Calculator",
+      "track_id": 2,
+      "label": "Handbag",
       "box_id": "BOX-001",
-      "timestamp": 11.335,
-      "frame": 24
+      "timestamp": 19.576,
+      "frame": 20,
+      "status": "removed",
+      "exit_frame": 30,
+      "exit_ts": 29.364
     },
     {
       "instance_id": 3,
-      "track_id": 11,
-      "label": "Apple",
+      "track_id": 3,
+      "label": "Sunglasses",
       "box_id": "BOX-001",
-      "timestamp": 16.057,
-      "frame": 34
+      "timestamp": 21.534,
+      "frame": 22,
+      "status": "removed",
+      "exit_frame": 32,
+      "exit_ts": 31.322
     },
     {
       "instance_id": 4,
-      "track_id": 17,
-      "label": "Screwdriver",
+      "track_id": 4,
+      "label": "Apple",
       "box_id": "BOX-001",
-      "timestamp": 19.835,
-      "frame": 42
+      "timestamp": 30.343,
+      "frame": 31,
+      "status": "removed",
+      "exit_frame": 50,
+      "exit_ts": 48.94
+    },
+    {
+      "instance_id": 5,
+      "track_id": 6,
+      "label": "Bottle",
+      "box_id": "BOX-001",
+      "timestamp": 39.152,
+      "frame": 40,
+      "status": "removed",
+      "exit_frame": 57,
+      "exit_ts": 55.792
+    },
+    {
+      "instance_id": 6,
+      "track_id": 8,
+      "label": "Scissors",
+      "box_id": "BOX-001",
+      "timestamp": 44.046,
+      "frame": 45,
+      "status": "removed",
+      "exit_frame": 57,
+      "exit_ts": 55.792
     }
   ]
 }
