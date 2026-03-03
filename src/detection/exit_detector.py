@@ -1,5 +1,5 @@
 ##############################################################################
-# @Author: (generated)
+# @Author: Peter Nolan
 # @Document: 'exit_detector.py'
 #
 # Description:

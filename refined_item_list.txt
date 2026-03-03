@@ -1,3 +1,0 @@
-item 1: "Apple"
-item 2: "Calculator"
-item 3: "Screwdriver"

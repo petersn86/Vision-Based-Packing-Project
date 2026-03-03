@@ -3,7 +3,7 @@
 
 # Video Processing Settings
 video:
-  frame_interval: 0.5
+  frame_interval: 1.0
   default_video: "data/videos/packing_video.mp4"
 
 # Directory Paths
