@@ -10,6 +10,9 @@
 #
 # FIXED: Added encoding='utf-8' to all file reads/writes
 #        to prevent Windows charmap errors.
+# UPDATED: Added human-in-the-loop exit confirmation endpoints:
+#          GET  /exit_confirmations   — returns pending exit events for UI
+#          POST /exit_confirm/<id>    — user submits Yes/No answer
 #
 ##############################################
 
@@ -36,9 +39,21 @@ Path(UPLOAD_FOLDER).mkdir(exist_ok=True)
 Path('data/frames').mkdir(parents=True, exist_ok=True)
 Path('data/yolo_frames').mkdir(parents=True, exist_ok=True)
 Path('data/videos').mkdir(parents=True, exist_ok=True)
+Path('data/exit_crops').mkdir(parents=True, exist_ok=True)
 
 # Processing status storage
 processing_status = {}
+
+# Shared exit confirmation queue (populated by ExitDetector, read by routes below)
+# Imported lazily inside routes to avoid circular import at startup.
+def _get_confirmation_queue():
+    try:
+        import sys
+        sys.path.insert(0, 'src')
+        from detection.exit_detector import confirmation_queue
+        return confirmation_queue
+    except Exception:
+        return {}
 
 
 def allowed_file(filename):
@@ -82,7 +97,7 @@ def process_video_async(video_path, job_id):
         # ---- Windows UTF-8 fix (env vars only, no stdout wrapping in threads) ----
         import os
         os.environ['PYTHONUTF8'] = '1'
-        os.environ['PYTHONIOENCODING'] = 'utf-8' 
+        os.environ['PYTHONIOENCODING'] = 'utf-8'
 
         from main import main as process_pipeline
         process_pipeline(video_path)
@@ -107,11 +122,11 @@ def process_video_async(video_path, job_id):
 
         # Check for output files
         processing_status[job_id]['files'] = {
-            'detection_log': os.path.exists('detection_log.csv'),
-            'item_list': os.path.exists('refined_item_list.txt'),
+            'detection_log':   os.path.exists('detection_log.csv'),
+            'item_list':       os.path.exists('refined_item_list.txt'),
             'annotated_video': os.path.exists('data/videos/output_annotated.mp4'),
-            'entry_log': os.path.exists('entry_log.json'),
-            'box_mappings': os.path.exists('box_mappings.json')
+            'entry_log':       os.path.exists('entry_log.json'),
+            'box_mappings':    os.path.exists('box_mappings.json'),
         }
 
     except Exception as e:
@@ -122,6 +137,10 @@ def process_video_async(video_path, job_id):
         import traceback
         traceback.print_exc()
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Routes
+# ──────────────────────────────────────────────────────────────────────────────
 
 @app.route('/')
 def index():
@@ -155,12 +174,12 @@ def upload_file():
 
     # Initialize processing status
     processing_status[job_id] = {
-        'job_id': job_id,
-        'filename': filename,
-        'status': 'queued',
-        'message': 'Video uploaded, waiting to start...',
+        'job_id':      job_id,
+        'filename':    filename,
+        'status':      'queued',
+        'message':     'Video uploaded, waiting to start...',
         'uploaded_at': datetime.now().isoformat(),
-        'filepath': filepath
+        'filepath':    filepath,
     }
 
     # Start processing in background
@@ -172,7 +191,7 @@ def upload_file():
 
     return jsonify({
         'job_id': job_id,
-        'message': 'Upload successful, processing started'
+        'message': 'Upload successful, processing started',
     })
 
 
@@ -181,7 +200,6 @@ def get_status(job_id):
     """Get processing status"""
     if job_id not in processing_status:
         return jsonify({'error': 'Job not found'}), 404
-
     return jsonify(processing_status[job_id])
 
 
@@ -197,10 +215,10 @@ def get_results(job_id):
         return jsonify({'error': 'Processing not complete'}), 400
 
     results = {
-        'job_id': job_id,
-        'items': status.get('items', []),
+        'job_id':     job_id,
+        'items':      status.get('items', []),
         'item_count': status.get('item_count', 0),
-        'files': status.get('files', {})
+        'files':      status.get('files', {}),
     }
 
     # ---- FIX: encoding='utf-8' on all file reads ----
@@ -237,11 +255,11 @@ def get_results(job_id):
 def download_file(file_type):
     """Download result files"""
     files = {
-        'items': 'refined_item_list.txt',
-        'log': 'detection_log.csv',
-        'video': 'data/videos/output_annotated.mp4',
-        'entry_log': 'entry_log.json',
-        'box_mappings': 'box_mappings.json'
+        'items':       'refined_item_list.txt',
+        'log':         'detection_log.csv',
+        'video':       'data/videos/output_annotated.mp4',
+        'entry_log':   'entry_log.json',
+        'box_mappings':'box_mappings.json',
     }
 
     if file_type not in files:
@@ -255,20 +273,94 @@ def download_file(file_type):
     return send_file(filepath, as_attachment=True)
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Exit confirmation routes (human-in-the-loop)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.route('/exit_confirmations')
+def get_exit_confirmations():
+    """
+    Returns all pending (unanswered) exit confirmation requests.
+    The frontend polls this every 3 seconds while a job is processing.
+
+    Response shape:
+    {
+      "pending": [
+        {
+          "confirmation_id": "exit_3_42",
+          "label":           "Mug",
+          "box_id":          "BOX-001",
+          "frame":           42,
+          "timestamp":       19.5,
+          "image_b64":       "<base64 JPEG of box crop>"
+        },
+        ...
+      ]
+    }
+    """
+    confirmation_queue = _get_confirmation_queue()
+    pending = [
+        {
+            "confirmation_id": cid,
+            "label":           entry["label"],
+            "box_id":          entry["box_id"],
+            "frame":           entry["frame"],
+            "timestamp":       round(entry["timestamp"], 2),
+            "image_b64":       entry["image_b64"],
+        }
+        for cid, entry in confirmation_queue.items()
+        if entry["answer"] is None
+    ]
+    return jsonify({"pending": pending})
+
+
+@app.route('/exit_confirm/<confirmation_id>', methods=['POST'])
+def submit_exit_confirmation(confirmation_id):
+    """
+    User submits their answer for an exit confirmation.
+
+    Request body (JSON):
+      { "confirmed": true }   → item was removed
+      { "confirmed": false }  → item is still present (false alarm)
+
+    Response:
+      { "ok": true, "confirmation_id": "exit_3_42" }
+    """
+    confirmation_queue = _get_confirmation_queue()
+
+    if confirmation_id not in confirmation_queue:
+        return jsonify({"error": "Unknown confirmation ID"}), 404
+
+    data      = request.get_json(silent=True) or {}
+    confirmed = bool(data.get("confirmed", False))
+
+    confirmation_queue[confirmation_id]["answer"] = confirmed
+
+    label = confirmation_queue[confirmation_id]["label"]
+    box   = confirmation_queue[confirmation_id]["box_id"]
+    print(
+        f"[HUMAN] Exit {'CONFIRMED' if confirmed else 'REJECTED'}: "
+        f"'{label}' from {box} (id={confirmation_id})"
+    )
+
+    return jsonify({"ok": True, "confirmation_id": confirmation_id})
+
+
 @app.route('/health')
 def health():
     """Health check endpoint"""
     return jsonify({
-        'status': 'healthy',
-        'timestamp': datetime.now().isoformat()
+        'status':    'healthy',
+        'timestamp': datetime.now().isoformat(),
     })
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+
 if __name__ == '__main__':
-    # ---- Windows UTF-8 fix ----
     import sys, os
-    os.environ['PYTHONUTF8'] = '1'
-    os.environ['PYTHONIOENCODING'] = 'utf-8' 
+    os.environ['PYTHONUTF8']        = '1'
+    os.environ['PYTHONIOENCODING']  = 'utf-8'
 
     print("[INFO] Starting Vision-Based Packing Web Interface")
     print("[INFO] Access at: http://localhost:5000")

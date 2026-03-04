@@ -1,0 +1,3 @@
+item 1: "Bottle"
+item 2: "Mug"
+item 3: "Scissors"

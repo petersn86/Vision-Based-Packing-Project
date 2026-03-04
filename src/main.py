@@ -5,15 +5,16 @@
 #
 # Description:
 # Main entry point for the Vision-Based-Packing-Project pipeline.
-# Extracts frames, runs YOLO detections, then refines labels using LLaMA
-# vision reasoning through Ollama. Entry detection works for items already
-# in boxes OR items entering boxes.
 #
-# Item deduplication is handled by ItemRegistry (stable instance IDs).
-# Box identity is handled by BoxTracker (stable box IDs across frames).
-#
-# MODIFIED: Added image preprocessing for YOLO (not LLaMA)
-# MODIFIED: Added two-stage exit detection (hand-overlap + LLaMA verification)
+# MODIFIED: Replaced ByteTrack + MobileNetV2 with SimpleTracker (IOU only)
+# MODIFIED: Exit detection uses human confirmation via web UI + audio alert
+# MODIFIED: hand_detected passed to update_absences so hand_flagged is not
+#           cleared mid-pickup
+# MODIFIED: ever_hand_flagged used in end-of-video flush so items touched
+#           by a hand are always prompted even if absent_frames == 0 at EOV
+# MODIFIED: sink + large appliances added to UNCERTAIN_YOLO_LABELS to stop
+#           LLaMA hallucinating item labels from an empty box
+# REMOVED:  QRDetector, BoxItemMapper, image_preprocessor, save_cropped_images
 ###############################################################################
 
 from video_processor                import extractFrames
@@ -22,24 +23,19 @@ from detection.object_detector      import ObjectDetector
 from detection.frame_reasoner       import FrameReasoner
 from detection.object_tracker       import ObjectTracker
 from detection.video_annotator      import VideoAnnotator
-from detection.qr_detector          import QRDetector, BoxItemMapper
 from detection.entry_detector       import EntryDetector
-from detection.exit_detector        import ExitDetector          # NEW: Exit detection
+from detection.exit_detector        import ExitDetector, confirmation_queue
 from detection.plausibility_filter  import PlausibilityFilter
 from detection.item_registry        import ItemRegistry
 from detection.hand_detector        import HandDetector
-from detection.image_preprocessor   import enhance_for_detection
 import sys, os
-import io
+import time
 
-# ---- Windows UTF-8 encoding fix ----
-# Set environment variable only - do NOT wrap sys.stdout here.
-# Wrapping stdout twice (here + in app.py thread) corrupts file handles.
-os.environ["PYTHONUTF8"] = "1"
+os.environ["PYTHONUTF8"]       = "1"
 os.environ["PYTHONIOENCODING"] = "utf-8"
 
 sys.path.insert(0, '..')
-from config_loader                  import get_config
+from config_loader import get_config
 import cv2
 from pathlib import Path
 import csv
@@ -52,20 +48,36 @@ from typing import List
 # ------------------ Project Root ------------------ #
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# YOLO labels that are too generic to be trusted when LLaMA agrees with them.
-# If LLaMA returns the same label as YOLO AND that label is in this set,
-# the detection is treated as uncertain and merged into the most recent
-# in_box instance rather than creating a new one.
-# Add labels here if you see YOLO misclassifying many different objects
-# as the same class (check the yolo_label column in detection_log.csv).
+# YOLO labels too generic or impossible to trust inside a packing box.
+# When YOLO returns one of these, LLaMA is called WITHOUT box context so
+# it cannot anchor on existing items and hallucinate labels like "Scissors"
+# from an empty box that YOLO thought was a "sink".
 UNCERTAIN_YOLO_LABELS = {
     "bottle", "cell phone", "remote", "refrigerator",
     "microwave", "tv", "laptop", "cup", "vase", "bowl",
-    "toothbrush", "hair drier", "scissors",  # Often misidentified tools
-    "knife", "fork", "spoon",                # Cutlery often misidentified
-    "bed", "couch", "sofa", "bench",         # Furniture too large for boxes
-    "dining table", "desk", "chair",          # More furniture
+    "toothbrush", "hair drier", "scissors",
+    "knife", "fork", "spoon",
+    "bed", "couch", "sofa", "bench",
+    "dining table", "desk", "chair",
+    # Large appliances / fixtures — never inside a packing box
+    "sink", "toilet", "bathtub", "oven", "toaster",
+    "clock", "potted plant", "fire hydrant",
 }
+
+
+# ------------------ Audio Alert ------------------ #
+def play_alert():
+    """Beep to alert the user that an exit confirmation is needed."""
+    try:
+        import winsound
+        winsound.Beep(1000, 300)
+    except Exception:
+        try:
+            sys.stdout.write('\a')
+            sys.stdout.flush()
+        except Exception:
+            pass
+
 
 # ------------------ Logging Setup ----------------- #
 def setup_logging(config):
@@ -109,16 +121,6 @@ def item_larger_than_box(item_bbox: list, box_bbox: list) -> bool:
 
 
 def get_hand_bboxes(hand_detector: HandDetector, frame: np.ndarray) -> List[List[int]]:
-    """
-    Run the hand model and return a list of bounding boxes [[x1,y1,x2,y2], ...].
-
-    Returns ALL detections from the hand model regardless of class label —
-    the model may use labels like 'gloves', 'no_gloves', 'hand', 'person', etc.
-    depending on which weights are loaded. We trust the model's confidence
-    threshold to filter noise rather than filtering by label name.
-
-    Falls back to [] if the model is unavailable or errors.
-    """
     try:
         results = hand_detector.model.predict(
             frame,
@@ -182,7 +184,6 @@ def main(videoPath=None):
     box_labels         = config.get('detection.box_labels', ['box', 'carton', 'cardboard'])
 
     logger.info(f"Initializing YOLO models: {yolo_model}, {box_model_path}")
-    logger.info(f"Item conf: {conf_threshold} | Box conf: {box_conf_threshold}")
     detector = ObjectDetector(str(yolo_model), str(box_model_path))
 
     # ---------------- Hand Detector ---------------- #
@@ -219,7 +220,7 @@ def main(videoPath=None):
 
     # ---------------- Item Registry ---------------- #
     same_item_window           = config.get('item_registry.same_item_window', 20)
-    label_similarity_threshold = config.get('item_registry.label_similarity_threshold', 0.3)
+    label_similarity_threshold = config.get('item_registry.label_similarity_threshold', 0.5)
     registry = ItemRegistry(
         same_item_window=same_item_window,
         label_similarity_threshold=label_similarity_threshold
@@ -250,24 +251,19 @@ def main(videoPath=None):
     exit_detector = None
     if exit_detection_enabled:
         exit_detector = ExitDetector(
-            absence_threshold      = config.get('exit_detection.absence_threshold',       8),
-            hand_overlap_threshold = config.get('exit_detection.hand_overlap_threshold',  0.30),
-            llama_model            = config.get('llama.model_name',                       'llama3.2-vision'),
-            llama_enabled          = config.get('exit_detection.llama_verification',      True),
-            llama_max_retries      = config.get('llama.max_retries',                      2),
-            geometric_fallback     = config.get('exit_detection.geometric_fallback',      True),
-            geometric_threshold    = config.get('exit_detection.geometric_threshold',     15),
+            absence_threshold      = config.get('exit_detection.absence_threshold',      8),
+            hand_overlap_threshold = config.get('exit_detection.hand_overlap_threshold', 0.30),
+            geometric_threshold    = config.get('exit_detection.geometric_threshold',    15),
         )
         logger.info(
-            f"Exit detection enabled | "
-            f"absence_threshold={config.get('exit_detection.absence_threshold', 8)} | "
-            f"hand_overlap={config.get('exit_detection.hand_overlap_threshold', 0.30)} | "
-            f"llama_verification={config.get('exit_detection.llama_verification', True)}"
+            f"Exit detection enabled (human confirmation + audio alert) | "
+            f"absence={config.get('exit_detection.absence_threshold', 8)} frames | "
+            f"hand_overlap={config.get('exit_detection.hand_overlap_threshold', 0.30)}"
         )
     else:
         logger.info("Exit detection disabled")
 
-    # ---------------- LLaMA Reasoner ---------------- #
+    # ---------------- LLaMA Reasoner (label refinement only) ---------------- #
     llama_enabled = config.get('llama.enabled', True)
     reasoner      = None
     if llama_enabled:
@@ -305,14 +301,9 @@ def main(videoPath=None):
     detected_boxes_count        = 0
     total_plausibility_discards = 0
     total_exit_events           = 0
-
-    # Cache: track_id -> refined_label
-    # Once a track has been through LLaMA, subsequent re-detections of the
-    # same track_id skip LLaMA and use the cached label directly.
-    label_cache: dict = {}
+    label_cache: dict           = {}
 
     logger.info("Running detection pipeline...")
-    logger.info("Image preprocessing: ENABLED for YOLO (standard preset)")
 
     # ---------------- Main Frame Loop ---------------- #
     for f in framesData:
@@ -321,20 +312,13 @@ def main(videoPath=None):
         timestamp        = meta_map.get(f.get('filename'), None)
         frame_h, frame_w = originalFrame.shape[:2]
 
-        # ============================================
-        # PREPROCESS FOR YOLO ONLY (NOT LLAMA)
-        # ============================================
-        yoloFrame = enhance_for_detection(originalFrame, preset='standard')
-
-        # ---- Hand detection (uses original frame) ----
-        # bool flag for CSV logging
+        # ---- Hand detection ----
         hand_detected = hand_detector.detect(originalFrame)
-        # bbox list for exit detector stage-1 overlap check
         hand_bboxes   = get_hand_bboxes(hand_detector, originalFrame)
 
-        # ---- YOLO detections (uses enhanced frame) ----
+        # ---- YOLO detections ----
         detections = detector.detectObjects(
-            yoloFrame,
+            originalFrame,
             confThresh=conf_threshold,
             boxConfThresh=box_conf_threshold
         )
@@ -348,37 +332,23 @@ def main(videoPath=None):
             elif det['label'].lower() not in ignoreLabels:
                 item_detections_raw.append(det)
 
-        # ---- Assign placeholder box ID ----
-        # All detected boxes get the same ID for now.
-        # Will be replaced with barcode-scanned IDs later.
         box_detections = [{**det, 'box_id': 'BOX-001'} for det in box_detections_raw]
 
         if box_detections:
             detected_boxes_count += len(box_detections)
-            logger.debug(
-                f"Frame {frame_idx}: boxes active = "
-                f"{[b['box_id'] for b in box_detections]}"
-            )
-
-        # All item detections pass through to LLaMA.
-        # Plausibility check runs AFTER refinement so LLaMA gets a chance
-        # to correct mislabels (e.g. YOLO: "refrigerator" -> LLaMA: "Tissue Box").
-        item_detections = item_detections_raw
-
-        if box_detections:
             logger.info(
                 f"Frame {frame_idx}: {len(box_detections)} box(es) | "
-                f"{len(item_detections)} item(s) | "
+                f"{len(item_detections_raw)} item(s) | "
                 f"hand_detected={hand_detected}"
             )
 
         # ---- Item tracking ----
         if tracker:
-            tracked_objects = tracker.update(item_detections, frame=originalFrame)
+            tracked_objects = tracker.update(item_detections_raw, frame=originalFrame)
         else:
-            tracked_objects = [{**det, 'track_id': None} for det in item_detections]
+            tracked_objects = [{**det, 'track_id': None} for det in item_detections_raw]
 
-        # ---- Video annotation (uses original frame) ----
+        # ---- Video annotation ----
         if video_output_enabled:
             detections_per_frame[frame_idx] = {
                 'detections': tracked_objects + [
@@ -388,17 +358,14 @@ def main(videoPath=None):
                 'hand_detected': hand_detected
             }
 
-        # ---- Per-object processing ----
-        # Notify EntryDetector of all visible tracks so _last_seen_frame stays
-        # current even for items detected outside the box (e.g. being picked up).
-        # This prevents stale eviction from firing on items still visible but
-        # momentarily outside the box region.
+        # ---- Notify EntryDetector of all visible tracks ----
         if entry_detector:
             for obj in tracked_objects:
                 tid = obj.get('track_id')
                 if tid is not None:
                     entry_detector.notify_track_seen(tid, frame_idx)
 
+        # ---- Per-object processing ----
         for obj in tracked_objects:
             track_id   = obj.get('track_id')
             yoloLabel  = obj["label"]
@@ -408,18 +375,13 @@ def main(videoPath=None):
             if yoloLabel.lower() in ignoreLabels:
                 continue
 
-            # ---- Fast path: cached track_id ----
-            # If we've already refined this track, we know what it is.
-            # Skip LLaMA and go straight to entry detection.
+            furniture_labels = {'bed', 'couch', 'sofa', 'desk', 'dining table'}
+
+            # ---- Fast path: cached track ----
             if track_id is not None and track_id in label_cache:
                 refined_label = label_cache[track_id]
-                is_uncertain  = False  # cached labels are already trusted
-                logger.debug(
-                    f"[CACHE] Track#{track_id} '{yoloLabel}' "
-                    f"-> '{refined_label}' (cached)"
-                )
+                is_uncertain  = False
 
-                # ---- Entry detection (cached track) ----
                 entry_detected = False
                 box_id         = None
 
@@ -434,49 +396,24 @@ def main(videoPath=None):
                             box_id=box_det['box_id'],
                             box_bbox=box_bbox,
                             frame_number=frame_idx,
-                            overlap_threshold=config.get(
-                                'entry_detection.overlap_threshold', 0.5)
+                            overlap_threshold=config.get('entry_detection.overlap_threshold', 0.5)
                         )
                         if confirmed:
                             entry_detected = True
                             box_id         = box_det['box_id']
-                            logger.info(
-                                f"[ENTRY] Frame {frame_idx}: "
-                                f"Track#{track_id} '{refined_label}' in {box_id}"
-                            )
+                            logger.info(f"[ENTRY] Frame {frame_idx}: Track#{track_id} '{refined_label}' in {box_id}")
                             break
 
-                # ---- Furniture rejection (cached path) ----
-                furniture_labels = {'bed', 'couch', 'sofa', 'desk', 'dining table'}
                 if refined_label.lower().strip() in furniture_labels and entry_detected and box_id:
-                    logger.info(
-                        f"[PLAUSIBILITY] Discarded cached track: '{refined_label}' "
-                        f"cannot fit inside {box_id}"
-                    )
-                    csv_writer.writerow([
-                        frame_idx, f.get('filename'), timestamp,
-                        yoloLabel, confidence, refined_label,
-                        track_id, None, None,
-                        False, False, hand_detected,
-                        False, None,
-                    ])
+                    csv_writer.writerow([frame_idx, f.get('filename'), timestamp, yoloLabel, confidence, refined_label, track_id, None, None, False, False, hand_detected, False, None])
                     continue
 
                 if entry_enabled and not entry_detected:
-                    csv_writer.writerow([
-                        frame_idx, f.get('filename'), timestamp,
-                        yoloLabel, confidence, None,
-                        track_id, None, None,
-                        False, False, hand_detected,
-                        False, None,
-                    ])
+                    csv_writer.writerow([frame_idx, f.get('filename'), timestamp, yoloLabel, confidence, None, track_id, None, None, False, False, hand_detected, False, None])
                     continue
 
             else:
-                # ---- Slow path: new track_id, not yet cached ----
-                # Run entry detection FIRST using bbox geometry (label irrelevant).
-                # Only call LLaMA if the object is actually inside a box.
-
+                # ---- Slow path: new track — entry detection then LLaMA ----
                 entry_detected = False
                 box_id         = None
 
@@ -491,8 +428,7 @@ def main(videoPath=None):
                             box_id=box_det['box_id'],
                             box_bbox=box_bbox,
                             frame_number=frame_idx,
-                            overlap_threshold=config.get(
-                                'entry_detection.overlap_threshold', 0.5)
+                            overlap_threshold=config.get('entry_detection.overlap_threshold', 0.5)
                         )
                         if confirmed:
                             entry_detected = True
@@ -500,146 +436,63 @@ def main(videoPath=None):
                             break
 
                 if entry_enabled and not entry_detected:
-                    # Not in a box — log with raw YOLO label, skip LLaMA
-                    csv_writer.writerow([
-                        frame_idx, f.get('filename'), timestamp,
-                        yoloLabel, confidence, None,
-                        track_id, None, None,
-                        False, False, hand_detected,
-                        False, None,
-                    ])
+                    csv_writer.writerow([frame_idx, f.get('filename'), timestamp, yoloLabel, confidence, None, track_id, None, None, False, False, hand_detected, False, None])
                     continue
 
-                # Item IS in a box — now worth running LLaMA
+                # Item is in a box — run LLaMA for label refinement
                 x1, y1, x2, y2 = bbox
-                crop = originalFrame[y1:y2, x1:x2]  # Crop from ORIGINAL frame for LLaMA
+                crop = originalFrame[y1:y2, x1:x2]
 
                 if crop.size == 0:
                     logger.warning(f"Empty crop for '{yoloLabel}' frame {frame_idx}")
                     refined_label = yoloLabel
                 else:
-                    # Get box context
-                    box_context_full = registry.get_unique_labels_for_box(
-                        box_id or "GLOBAL"
-                    )
-
-                    # CRITICAL FIX: Don't use box context if YOLO label is uncertain.
-                    # Uncertain labels lead LLaMA to incorrectly match against box items
-                    # (e.g., screwdriver misidentified as bottle because "Bottle" is in context)
-                    uncertain_yolo = yoloLabel.lower().strip() in UNCERTAIN_YOLO_LABELS
-
-                    if uncertain_yolo:
-                        box_context = None
-                        logger.debug(
-                            f"[UNCERTAIN YOLO] '{yoloLabel}' - disabling box context "
-                            f"for unbiased LLaMA analysis"
-                        )
-                    else:
-                        # YOLO is reliable - use box context for consistency
-                        box_context = box_context_full
+                    box_context_full = registry.get_unique_labels_for_box(box_id or "GLOBAL")
+                    uncertain_yolo   = yoloLabel.lower().strip() in UNCERTAIN_YOLO_LABELS
+                    box_context      = None if uncertain_yolo else box_context_full
 
                     if reasoner:
-                        refined_label = reasoner.refineDetection(
-                            crop, yoloLabel, box_context=box_context
-                        )
+                        refined_label = reasoner.refineDetection(crop, yoloLabel, box_context=box_context)
                     refined_label = refined_label or yoloLabel
 
-                    # SAFE NORMALIZATION: Only normalize if LLaMA confirmed YOLO's label
                     if reasoner and refined_label.lower().strip() == yoloLabel.lower().strip():
                         original_label = refined_label
                         refined_label  = reasoner.normalize_label(refined_label)
                         if original_label != refined_label:
-                            logger.info(
-                                f"[NORMALIZE] '{original_label}' → '{refined_label}' "
-                                f"(LLaMA confirmed YOLO)"
-                            )
+                            logger.info(f"[NORMALIZE] '{original_label}' → '{refined_label}'")
 
-                    # ---- Plausibility check on refined label ----
                     _, discards = plausibility_filter.filter(
                         [{'label': refined_label, 'confidence': confidence, 'bbox': bbox}],
                         frame_w, frame_h
                     )
                     if discards:
                         total_plausibility_discards += 1
-                        logger.info(
-                            f"[PLAUSIBILITY] Discarded: YOLO='{yoloLabel}' "
-                            f"-> LLaMA='{refined_label}' (bbox too small)"
-                        )
-                        csv_writer.writerow([
-                            frame_idx, f.get('filename'), timestamp,
-                            yoloLabel, confidence, refined_label,
-                            track_id, None, None,
-                            False, False, hand_detected,
-                            False, None,
-                        ])
+                        csv_writer.writerow([frame_idx, f.get('filename'), timestamp, yoloLabel, confidence, refined_label, track_id, None, None, False, False, hand_detected, False, None])
                         continue
 
-                    # ---- Extra check: reject furniture detections inside boxes ----
-                    furniture_labels = {'bed', 'couch', 'sofa', 'desk', 'dining table'}
                     if refined_label.lower().strip() in furniture_labels and box_id:
                         total_plausibility_discards += 1
-                        logger.info(
-                            f"[PLAUSIBILITY] Discarded: '{refined_label}' "
-                            f"cannot fit inside {box_id}"
-                        )
-                        csv_writer.writerow([
-                            frame_idx, f.get('filename'), timestamp,
-                            yoloLabel, confidence, refined_label,
-                            track_id, None, None,
-                            False, False, hand_detected,
-                            False, None,
-                        ])
+                        csv_writer.writerow([frame_idx, f.get('filename'), timestamp, yoloLabel, confidence, refined_label, track_id, None, None, False, False, hand_detected, False, None])
                         continue
 
-                    if config.get('output.save_cropped_images', True):
-                        cv2.imwrite(
-                            str(annotatedDir /
-                                f"frame{frame_idx:05d}_{yoloLabel}.jpg"),
-                            crop
-                        )
-
-                # Cache the refined label for this track_id
                 if track_id is not None:
                     label_cache[track_id] = refined_label
 
-                # Flag whether this is a genuinely uncertain LLaMA response.
                 is_uncertain = (
                     refined_label.lower().strip() == yoloLabel.lower().strip()
                     and yoloLabel.lower().strip() in UNCERTAIN_YOLO_LABELS
                 )
 
-                logger.info(
-                    f"[REFINED] Frame {frame_idx}: Track#{track_id} "
-                    f"'{yoloLabel}' -> '{refined_label}' | "
-                    f"context={box_context if box_context else '[]'}"
-                )
-
+                logger.info(f"[REFINED] Frame {frame_idx}: Track#{track_id} '{yoloLabel}' -> '{refined_label}'")
                 if entry_detected:
-                    logger.info(
-                        f"[ENTRY] Frame {frame_idx}: "
-                        f"Track#{track_id} '{refined_label}' in {box_id}"
-                    )
+                    logger.info(f"[ENTRY] Frame {frame_idx}: Track#{track_id} '{refined_label}' in {box_id}")
 
-            # ---- Final furniture check (after both paths merge) ----
-            furniture_labels = {'bed', 'couch', 'sofa', 'desk', 'dining table'}
-            if (refined_label and
-                refined_label.lower().strip() in furniture_labels and
-                box_id and
-                box_id != "GLOBAL"):
-                logger.info(
-                    f"[PLAUSIBILITY] Blocked '{refined_label}' from registry - "
-                    f"furniture cannot fit inside {box_id}"
-                )
-                csv_writer.writerow([
-                    frame_idx, f.get('filename'), timestamp,
-                    yoloLabel, confidence, refined_label,
-                    track_id, None, None,
-                    False, False, hand_detected,
-                    False, None,
-                ])
+            # ---- Final furniture gate ----
+            if refined_label and refined_label.lower().strip() in furniture_labels and box_id and box_id != "GLOBAL":
+                csv_writer.writerow([frame_idx, f.get('filename'), timestamp, yoloLabel, confidence, refined_label, track_id, None, None, False, False, hand_detected, False, None])
                 continue
 
-            # ---- Registry deduplication (uses refined label) ----
+            # ---- Registry deduplication ----
             instance_id, is_new_item = registry.register_entry(
                 track_id=track_id if track_id is not None else -1,
                 refined_label=refined_label,
@@ -651,36 +504,25 @@ def main(videoPath=None):
             )
 
             if is_new_item:
-                logger.info(
-                    f"[NEW ITEM] Instance #{instance_id} "
-                    f"Track#{track_id} '{yoloLabel}' -> '{refined_label}' "
-                    f"-> {box_id} at {timestamp}s"
-                )
+                logger.info(f"[NEW ITEM] Instance #{instance_id} Track#{track_id} '{yoloLabel}' -> '{refined_label}' -> {box_id} at {timestamp}s")
             else:
-                logger.debug(
-                    f"[RE-DET] Instance #{instance_id} Track#{track_id} "
-                    f"'{refined_label}'"
-                )
+                logger.debug(f"[RE-DET] Instance #{instance_id} Track#{track_id} '{refined_label}'")
 
-            # ---- CSV row ----
             csv_writer.writerow([
                 frame_idx, f.get('filename'), timestamp,
                 yoloLabel, confidence, refined_label,
                 track_id, instance_id, box_id,
                 entry_detected, is_new_item, hand_detected,
-                False, None,  # exit columns — not an exit event row
+                False, None,
             ])
 
         # =====================================================================
-        # EXIT DETECTION (runs once per frame, after all per-object processing)
+        # EXIT DETECTION
         # =====================================================================
         if exit_detector and entry_detector:
 
-            # --- Sync registry → exit detector so newly registered items are tracked ---
             exit_detector.sync_registry(registry)
 
-            # --- Stage 1: hand-overlap flagging ---
-            # Build {track_id: bbox} for all currently visible tracked objects
             active_track_bboxes = {
                 obj['track_id']: obj['bbox']
                 for obj in tracked_objects
@@ -693,18 +535,15 @@ def main(videoPath=None):
                 hand_detected       = hand_detected,
             )
 
-            # --- Stage 2: absence counting + LLaMA verification ---
-            # Pass current_frame so stale tracks (items that vanished from YOLO
-            # without ever being detected outside the box) get evicted from
-            # confirmed_entries and their absence starts being counted.
             active_in_box = entry_detector.get_active_track_ids_in_box(
                 current_frame   = frame_idx,
                 stale_threshold = config.get('exit_detection.stale_threshold', 5),
             )
+            box_bboxes_map = {bd['box_id']: bd['bbox'] for bd in box_detections}
 
-            # Build {box_id: bbox} from current frame's box detections
-            box_bboxes_map = {
-                bd['box_id']: bd['bbox'] for bd in box_detections
+            # Snapshot pending queue before update to detect newly posted requests
+            prev_pending = {
+                cid for cid, e in confirmation_queue.items() if e['answer'] is None
             }
 
             confirmed_removals = exit_detector.update_absences(
@@ -714,44 +553,39 @@ def main(videoPath=None):
                 frame_number            = frame_idx,
                 timestamp               = timestamp or 0.0,
                 registry                = registry,
+                hand_detected           = hand_detected,   # ← passed through
             )
 
-            # --- Apply confirmed removals ---
-            llama_available = (
-                exit_detector._verifier is not None
-                and exit_detector._verifier.available
-            )
+            # ---- Play alert for newly posted confirmation requests ----
+            new_pending = {
+                cid for cid, e in confirmation_queue.items() if e['answer'] is None
+            }
+            if new_pending - prev_pending:
+                play_alert()
+                logger.info("[EXIT] 🔔 Audio alert played — awaiting user confirmation")
+
+            # ---- Apply confirmed removals (user clicked Yes) ----
             for instance_id, label, box_id in confirmed_removals:
                 registry.mark_removed(instance_id, frame_idx, timestamp or 0.0)
                 total_exit_events += 1
-                verified_by = "llama" if llama_available else "geometric"
                 logger.info(
                     f"[EXIT] ✓ '{label}' (#{instance_id}) removed from "
-                    f"{box_id} at t={timestamp:.2f}s frame={frame_idx} "
-                    f"[verified_by={verified_by}]"
+                    f"{box_id} at t={timestamp:.2f}s [verified_by=human]"
                 )
-                # Write a dedicated exit event row to the detection log
                 csv_writer.writerow([
                     frame_idx, f.get('filename'), timestamp,
                     "EXIT_EVENT", None, label,
                     None, instance_id, box_id,
                     False, False, hand_detected,
-                    True, verified_by,
+                    True, "human",
                 ])
 
-    # ---------------- End-of-video exit flush ---------------- #
-    # Items that were still accumulating absence frames when the video ended
-    # never crossed the threshold during the loop. Force a final LLaMA pass
-    # on candidates with meaningful absence — if LLaMA confirms the item is
-    # gone, mark it removed.
-    #
-    # IMPORTANT: We require absent_frames >= absence_threshold before firing
-    # LLaMA. Items with only a few absent frames are likely YOLO dropout on
-    # a stationary item that's still in the box — not a real removal.
-    # Only hand-flagged items or items absent for a long time qualify.
+    # =========================================================================
+    # END-OF-VIDEO: wait for pending human confirmations
+    # =========================================================================
     if exit_detector:
-        logger.info("Running end-of-video exit flush...")
-        # Final stale eviction pass
+        logger.info("Video processing complete. Checking end-of-video exit confirmations...")
+
         if entry_detector and framesData:
             entry_detector.get_active_track_ids_in_box(
                 current_frame   = framesData[-1]['index'],
@@ -759,93 +593,86 @@ def main(videoPath=None):
             )
             exit_detector.sync_registry(registry)
 
-        llama_available = (
-            exit_detector._verifier is not None
-            and exit_detector._verifier.available
-        )
+        last_frame     = framesData[-1]['index'] if framesData else 0
+        last_ts        = meta_map.get(framesData[-1].get('filename'), 0.0) if framesData else 0.0
+        last_frame_img = framesData[-1]['frame'] if framesData else None
 
-        flush_absence_min = config.get('exit_detection.flush_absence_min',
-                                       config.get('exit_detection.absence_threshold', 3))
-
+        # Post requests for qualifying unqueried candidates
         for cand in exit_detector.get_candidates().values():
-            if cand.confirmed_removed:
+            if cand.confirmed_removed or cand.user_queried:
                 continue
 
             full_video_frames = framesData[-1]['index'] if framesData else 0
             very_long_absence = cand.absent_frames >= int(full_video_frames * 0.6)
 
-            # Skip items with no absence AND no hand contact — definitely still present
-            if cand.absent_frames == 0 and not cand.hand_flagged:
+            # Skip items with no absence AND never touched — still present
+            if cand.absent_frames == 0 and not cand.ever_hand_flagged:
                 continue
 
-            # Skip items absent only briefly with no hand contact — YOLO dropout, not removal
-            if not cand.hand_flagged and not very_long_absence:
+            # Skip brief absence with no hand contact — likely YOLO dropout
+            if not cand.ever_hand_flagged and not very_long_absence:
                 logger.debug(
                     f"[EXIT-FLUSH] Skipping #{cand.instance_id} '{cand.label}' — "
-                    f"no hand interaction and absence ({cand.absent_frames} frames) "
-                    f"is likely YOLO dropout"
+                    f"no hand interaction, likely YOLO dropout"
                 )
                 continue
 
-            # Hand-flagged item still visible in final frame — YOLO may be detecting
-            # it mid-removal. Let LLaMA check the final frame to be sure.
-            if cand.absent_frames == 0 and cand.hand_flagged:
-                logger.info(
-                    f"[EXIT-FLUSH] #{cand.instance_id} '{cand.label}' hand-flagged "
-                    f"but still detected in final frame — verifying with LLaMA"
-                )
-
             logger.info(
-                f"[EXIT-FLUSH] #{cand.instance_id} '{cand.label}' "
-                f"absent {cand.absent_frames} frame(s) at video end — verifying"
+                f"[EXIT-FLUSH] Requesting confirmation for "
+                f"#{cand.instance_id} '{cand.label}' "
+                f"(absent={cand.absent_frames}, ever_hand_flagged={cand.ever_hand_flagged})"
             )
+            img = last_frame_img if last_frame_img is not None else np.zeros((100, 100, 3), dtype=np.uint8)
+            conf_id = exit_detector._verifier.request_confirmation(
+                box_crop     = img,
+                item_label   = cand.label,
+                box_id       = cand.box_id,
+                instance_id  = cand.instance_id,
+                frame_number = last_frame,
+                timestamp    = last_ts,
+            )
+            cand.user_queried    = True
+            cand.confirmation_id = conf_id
 
-            last_frame     = framesData[-1]['index'] if framesData else 0
-            last_ts        = meta_map.get(framesData[-1].get('filename'), 0.0) if framesData else 0.0
-            last_frame_img = framesData[-1]['frame'] if framesData else None
+        # Alert and wait for all pending end-of-video confirmations
+        pending_ids = {
+            cand.confirmation_id
+            for cand in exit_detector.get_candidates().values()
+            if cand.user_queried and not cand.confirmed_removed and cand.confirmation_id
+            and confirmation_queue.get(cand.confirmation_id, {}).get('answer') is None
+        }
 
-            item_present = True  # default conservative
+        if pending_ids:
+            play_alert()
+            logger.info(f"[EXIT-FLUSH] 🔔 Waiting for {len(pending_ids)} end-of-video confirmation(s)...")
+            while True:
+                if all(
+                    confirmation_queue.get(cid, {}).get('answer') is not None
+                    for cid in pending_ids
+                ):
+                    break
+                time.sleep(1.0)
+            logger.info("[EXIT-FLUSH] All confirmations received.")
 
-            if llama_available and last_frame_img is not None:
-                box_bbox  = exit_detector._box_bboxes.get(cand.box_id)
-                box_items = registry.get_unique_labels_for_box(cand.box_id)
-                if box_bbox is not None:
-                    box_crop     = exit_detector._crop_frame(last_frame_img, box_bbox)
-                    item_present = exit_detector._verifier.verify_item_present(
-                        box_crop, cand.label, box_items
-                    )
-                    logger.info(
-                        f"[EXIT-FLUSH] LLaMA says '{cand.label}' "
-                        f"{'PRESENT' if item_present else 'ABSENT'} (end-of-video check)"
-                    )
-                else:
-                    # No box bbox cached — cannot verify, assume still present
-                    item_present = True
-                    logger.warning(
-                        f"[EXIT-FLUSH] No box bbox cached for '{cand.label}' — "
-                        f"assuming PRESENT (conservative)"
-                    )
-            elif not llama_available:
-                # No LLaMA — only remove if hand-flagged (high confidence signal)
-                # otherwise keep as present to avoid false removals
-                item_present = not cand.hand_flagged
-
-            if not item_present:
+        # Apply flush results
+        for cand in exit_detector.get_candidates().values():
+            if cand.confirmed_removed or not cand.user_queried or not cand.confirmation_id:
+                continue
+            answer = confirmation_queue.get(cand.confirmation_id, {}).get('answer')
+            if answer is True:
                 registry.mark_removed(cand.instance_id, last_frame, last_ts or 0.0)
                 cand.confirmed_removed = True
                 total_exit_events += 1
-                verified_by = "llama_flush" if llama_available else "geometric_flush"
-                logger.info(
-                    f"[EXIT-FLUSH] ✓ '{cand.label}' (#{cand.instance_id}) "
-                    f"confirmed removed at end of video [verified_by={verified_by}]"
-                )
+                logger.info(f"[EXIT-FLUSH] ✓ '{cand.label}' (#{cand.instance_id}) removed [verified_by=human]")
                 csv_writer.writerow([
-                    last_frame, framesData[-1].get('filename') if framesData else None, last_ts,
-                    "EXIT_EVENT", None, cand.label,
+                    last_frame,
+                    framesData[-1].get('filename') if framesData else None,
+                    last_ts, "EXIT_EVENT", None, cand.label,
                     None, cand.instance_id, cand.box_id,
-                    False, False, False,
-                    True, verified_by,
+                    False, False, False, True, "human",
                 ])
+            else:
+                logger.info(f"[EXIT-FLUSH] ✗ '{cand.label}' (#{cand.instance_id}) rejected by user — keeping as present")
 
     # ---------------- Annotated video ---------------- #
     if annotator:
@@ -873,19 +700,16 @@ def main(videoPath=None):
     logger.info(f"Plausibility discards   : {total_plausibility_discards}")
     logger.info(f"Exit events confirmed   : {total_exit_events}")
 
-    # refined_item_list.txt
     with open(final_output_file, 'w', encoding='utf-8') as fout:
         for idx, name in enumerate(unique_labels, 1):
             fout.write(f'item {idx}: "{name.title()}"\n')
     logger.info(f"Item list saved -> {final_output_file}")
 
-    # item_registry.json
     registry_file = PROJECT_ROOT / 'item_registry.json'
     with open(registry_file, 'w', encoding='utf-8') as fout:
         json.dump(registry.export_to_dict(), fout, indent=2)
     logger.info(f"Registry saved -> {registry_file}")
 
-    # entry_log.json (backwards compat)
     entry_log_file = PROJECT_ROOT / 'entry_log.json'
     with open(entry_log_file, 'w', encoding='utf-8') as fout:
         json.dump({
@@ -907,7 +731,6 @@ def main(videoPath=None):
         }, fout, indent=2)
     logger.info(f"Entry log saved -> {entry_log_file}")
 
-    # box_mappings.json (backwards compat)
     export = registry.export_to_dict()
     box_mapping_file = PROJECT_ROOT / 'box_mappings.json'
     with open(box_mapping_file, 'w', encoding='utf-8') as fout:
@@ -925,9 +748,9 @@ def main(videoPath=None):
                 for box_id, items in export['by_box'].items()
             },
             'summary': {
-                'total_boxes':  len(export['by_box']),
-                'total_items':  export['summary']['total_unique_items'],
-                'items_in_box': export['summary']['items_in_box'],
+                'total_boxes':   len(export['by_box']),
+                'total_items':   export['summary']['total_unique_items'],
+                'items_in_box':  export['summary']['items_in_box'],
                 'items_removed': export['summary']['items_removed'],
             }
         }, fout, indent=2)
