@@ -56,6 +56,7 @@
             cursor: pointer;
             transition: all 0.3s ease;
             background: #f8f9ff;
+            margin-bottom: 20px;
         }
         
         .upload-area:hover {
@@ -82,7 +83,7 @@
         
         .upload-area p {
             color: #666;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
         }
         
         input[type="file"] {
@@ -253,6 +254,102 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* ── Exit confirmation notification cards ──────────────────────── */
+
+        #exit-confirmations {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 360px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .exit-card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+            overflow: hidden;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(120%); opacity: 0; }
+            to   { transform: translateX(0);    opacity: 1; }
+        }
+
+        .exit-card-header {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            padding: 10px 14px;
+            font-weight: 700;
+            font-size: 0.85em;
+            letter-spacing: 0.05em;
+        }
+
+        .exit-card-body {
+            padding: 12px 14px;
+        }
+
+        .exit-card-body img {
+            width: 100%;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .exit-card-question {
+            font-size: 0.95em;
+            color: #374151;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .exit-card-question strong {
+            color: #111827;
+        }
+
+        .exit-card-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-confirm-yes {
+            flex: 1;
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 9px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.2s;
+        }
+        .btn-confirm-yes:hover { background: #059669; }
+
+        .btn-confirm-no {
+            flex: 1;
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 9px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.2s;
+        }
+        .btn-confirm-no:hover { background: #dc2626; }
+
+        .exit-card-meta {
+            font-size: 0.75em;
+            color: #9ca3af;
+            margin-top: 8px;
+        }
     </style>
 </head>
 <body>
@@ -322,56 +419,142 @@
             </div>
         </div>
     </div>
-    
+
+    <!-- Exit confirmation toast container -->
+    <div id="exit-confirmations"></div>
+
     <script>
         let currentJobId = null;
         let statusCheckInterval = null;
-        
-        const uploadArea = document.getElementById('uploadArea');
-        const fileInput = document.getElementById('fileInput');
-        const statusArea = document.getElementById('statusArea');
-        const resultsArea = document.getElementById('resultsArea');
-        
-        // Drag and drop handlers
+
+        // ── Exit confirmation polling ────────────────────────────────────
+        const shownConfirmations = new Set();
+        let exitPollInterval = null;
+
+        function startExitPolling() {
+            if (exitPollInterval) return;
+            exitPollInterval = setInterval(pollExitConfirmations, 3000);
+        }
+
+        function stopExitPolling() {
+            clearInterval(exitPollInterval);
+            exitPollInterval = null;
+        }
+
+        async function pollExitConfirmations() {
+            try {
+                const res  = await fetch('/exit_confirmations');
+                const data = await res.json();
+
+                for (const item of data.pending) {
+                    if (!shownConfirmations.has(item.confirmation_id)) {
+                        shownConfirmations.add(item.confirmation_id);
+                        showExitCard(item);
+                    }
+                }
+            } catch (e) {
+                // Silently ignore network errors during polling
+            }
+        }
+
+        function showExitCard(item) {
+            const container = document.getElementById('exit-confirmations');
+
+            const card = document.createElement('div');
+            card.className = 'exit-card';
+            card.id        = `card-${item.confirmation_id}`;
+
+            card.innerHTML = `
+                <div class="exit-card-header">⚠️ EXIT DETECTED — USER CONFIRMATION NEEDED</div>
+                <div class="exit-card-body">
+                    <img src="data:image/jpeg;base64,${item.image_b64}"
+                         alt="Box contents at time of exit" />
+                    <div class="exit-card-question">
+                        Was <strong>${item.label}</strong> removed from
+                        <strong>${item.box_id}</strong>?
+                    </div>
+                    <div class="exit-card-buttons">
+                        <button class="btn-confirm-yes"
+                                onclick="submitConfirmation('${item.confirmation_id}', true)">
+                            ✅ Yes, removed
+                        </button>
+                        <button class="btn-confirm-no"
+                                onclick="submitConfirmation('${item.confirmation_id}', false)">
+                            ❌ Still in box
+                        </button>
+                    </div>
+                    <div class="exit-card-meta">
+                        Frame ${item.frame} &middot; t=${item.timestamp}s
+                    </div>
+                </div>
+            `;
+
+            container.appendChild(card);
+        }
+
+        async function submitConfirmation(confirmationId, confirmed) {
+            try {
+                await fetch(`/exit_confirm/${confirmationId}`, {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ confirmed }),
+                });
+            } catch (e) {
+                console.error('Failed to submit confirmation:', e);
+            }
+
+            // Animate card out and remove
+            const card = document.getElementById(`card-${confirmationId}`);
+            if (card) {
+                card.style.transition = 'opacity 0.3s, transform 0.3s';
+                card.style.opacity    = '0';
+                card.style.transform  = 'translateX(120%)';
+                setTimeout(() => card.remove(), 300);
+            }
+        }
+
+        // ── Upload and status ────────────────────────────────────────────
+
+        const uploadArea   = document.getElementById('uploadArea');
+        const fileInput    = document.getElementById('fileInput');
+        const statusArea   = document.getElementById('statusArea');
+        const resultsArea  = document.getElementById('resultsArea');
+
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('dragover');
         });
-        
+
         uploadArea.addEventListener('dragleave', () => {
             uploadArea.classList.remove('dragover');
         });
-        
+
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
             const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleFileUpload(files[0]);
-            }
+            if (files.length > 0) handleFileUpload(files[0]);
         });
-        
+
         fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                handleFileUpload(e.target.files[0]);
-            }
+            if (e.target.files.length > 0) handleFileUpload(e.target.files[0]);
         });
-        
+
         async function handleFileUpload(file) {
             const formData = new FormData();
             formData.append('video', file);
-            
+
             uploadArea.style.display = 'none';
             statusArea.classList.add('visible');
-            
+
             try {
                 const response = await fetch('/upload', {
                     method: 'POST',
-                    body: formData
+                    body: formData,
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (response.ok) {
                     currentJobId = data.job_id;
                     startStatusChecking();
@@ -382,88 +565,99 @@
                 showError('Upload failed: ' + error.message);
             }
         }
-        
+
         function startStatusChecking() {
             statusCheckInterval = setInterval(checkStatus, 2000);
         }
-        
+
         async function checkStatus() {
             if (!currentJobId) return;
-            
+
             try {
                 const response = await fetch(`/status/${currentJobId}`);
-                const data = await response.json();
-                
+                const data     = await response.json();
+
                 updateStatus(data);
-                
+
+                if (data.status === 'processing') {
+                    startExitPolling();   // begin polling for exit confirmations
+                }
+
                 if (data.status === 'completed') {
                     clearInterval(statusCheckInterval);
+                    stopExitPolling();
                     loadResults();
                 } else if (data.status === 'error') {
                     clearInterval(statusCheckInterval);
+                    stopExitPolling();
                     showError(data.message);
                 }
             } catch (error) {
                 console.error('Status check failed:', error);
             }
         }
-        
+
         function updateStatus(data) {
             const statusMessage = document.getElementById('statusMessage');
-            const progressBar = document.getElementById('progressBar');
-            const spinner = document.getElementById('spinner');
-            
+            const progressBar   = document.getElementById('progressBar');
+            const spinner       = document.getElementById('spinner');
+
             statusMessage.textContent = data.message;
-            
+
             if (data.status === 'processing') {
-                statusMessage.className = 'status-message status-processing';
-                progressBar.style.width = '50%';
-                progressBar.textContent = 'Processing...';
-                spinner.style.display = 'block';
+                statusMessage.className    = 'status-message status-processing';
+                progressBar.style.width    = '50%';
+                progressBar.textContent    = 'Processing...';
+                spinner.style.display      = 'block';
             } else if (data.status === 'completed') {
-                statusMessage.className = 'status-message status-complete';
-                progressBar.style.width = '100%';
-                progressBar.textContent = 'Complete!';
-                spinner.style.display = 'none';
+                statusMessage.className    = 'status-message status-complete';
+                progressBar.style.width    = '100%';
+                progressBar.textContent    = 'Complete!';
+                spinner.style.display      = 'none';
+            } else if (data.status === 'error') {
+                statusMessage.className    = 'status-message status-error';
+                progressBar.style.width    = '100%';
+                progressBar.textContent    = 'Error';
+                spinner.style.display      = 'none';
             }
         }
-        
+
         async function loadResults() {
             try {
                 const response = await fetch(`/results/${currentJobId}`);
-                const data = await response.json();
-                
+                const data     = await response.json();
+
                 document.getElementById('itemCount').textContent = data.item_count;
-                
+
                 const itemsList = document.getElementById('itemsList');
                 itemsList.innerHTML = '';
                 data.items.forEach(item => {
-                    const li = document.createElement('li');
+                    const li      = document.createElement('li');
                     li.textContent = item;
                     itemsList.appendChild(li);
                 });
-                
+
                 if (data.files && data.files.annotated_video) {
                     document.getElementById('downloadVideoBtn').style.display = 'inline-block';
                 }
-                
+
                 statusArea.classList.remove('visible');
                 resultsArea.classList.add('visible');
             } catch (error) {
                 showError('Failed to load results');
             }
         }
-        
+
         function downloadFile(type) {
             window.location.href = `/download/${type}`;
         }
-        
+
         function showError(message) {
             const statusMessage = document.getElementById('statusMessage');
-            const spinner = document.getElementById('spinner');
-            statusMessage.className = 'status-message status-error';
-            statusMessage.textContent = message;
-            spinner.style.display = 'none';
+            const spinner       = document.getElementById('spinner');
+            statusMessage.className    = 'status-message status-error';
+            statusMessage.textContent  = message;
+            spinner.style.display      = 'none';
         }
     </script>
 </body>

@@ -3,7 +3,7 @@
 
 # Video Processing Settings
 video:
-  frame_interval: 1.0
+  frame_interval: 0.5
   default_video: "data/videos/packing_video.mp4"
 
 # Directory Paths
@@ -23,15 +23,16 @@ detection:
     - "box"
     - "carton"
     - "cardboard"
-  confidence_threshold: 0.55        # Raised from 0.40 (was causing too much noise)
+  confidence_threshold: 0.25        # Raised from 0.40 (was causing too much noise)
                                      # Lower than original 0.60 to catch screwdriver
-  box_confidence_threshold: 0.35
+  box_confidence_threshold: 0.45
   ignore_labels:
     - "person"
     - "people"
     - "refrigerator"  # Always false positive in packing boxes
     - "microwave"     # Also too large for boxes
     - "oven"
+    - "sink"
 
 # Plausibility Filter
 plausibility_filter:
