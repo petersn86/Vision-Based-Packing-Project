@@ -3,7 +3,7 @@
 
 # Video Processing Settings
 video:
-  frame_interval: 0.5
+  frame_interval: 1.0
   default_video: "data/videos/packing_video.mp4"
 
 # Directory Paths
@@ -23,16 +23,16 @@ detection:
     - "box"
     - "carton"
     - "cardboard"
-  confidence_threshold: 0.25        # Raised from 0.40 (was causing too much noise)
+  confidence_threshold: 0.50        # Raised from 0.40 (was causing too much noise)
                                      # Lower than original 0.60 to catch screwdriver
-  box_confidence_threshold: 0.45
+  box_confidence_threshold: 0.35
   ignore_labels:
     - "person"
     - "people"
     - "refrigerator"  # Always false positive in packing boxes
     - "microwave"     # Also too large for boxes
     - "oven"
-    - "sink"
+    - "bed"
 
 # Plausibility Filter
 plausibility_filter:
@@ -68,20 +68,42 @@ tracking:
   reid_thresh: 0.50
   reid_buffer: 150
 
+# Barcode / QR Scanner
+# Replaces the old BOX-001 placeholder. Supports both 1D barcodes
+# (CODE128, EAN-13, etc.) and QR codes via pyzbar.
+# Set enabled: false to revert to auto-generated BOX-001, BOX-002 ... IDs.
+barcode_scanner:
+  enabled: true
+  max_age: 60                       # frames a scanned ID stays active without re-scan
+                                    # At 1fps default → 60 seconds of memory
+  multi_scale: true                 # try scaled copies for distant/small codes
+  scale_factors:
+    - 1.0
+    - 0.75
+    - 0.5
+    - 1.5
+  proximity_threshold: 200          # pixels – max centre-to-centre distance for
+                                    # associating a scanned code with a YOLO box bbox
+
 # Box Tracker
+# Propagates barcode-assigned IDs across frames using IoU matching.
+# When a code is hidden, the last known ID is carried forward.
+# Set enabled: false for simple single-box scenarios — barcode still works
+# but without cross-frame identity propagation.
 box_tracker:
+  enabled: true
   iou_threshold: 0.3
   max_age: 30
+
+# QR Code Detection (legacy – superseded by barcode_scanner above)
+qr_detection:
+  enabled: false
+  proximity_threshold: 100
 
 # Item Registry
 item_registry:
   same_item_window: 20
   label_similarity_threshold: 0.5   # Raised from 0.3 for better merging
-
-# QR Code Detection
-qr_detection:
-  enabled: false
-  proximity_threshold: 100
 
 # Entry Detection
 entry_detection:
@@ -110,7 +132,7 @@ exit_detection:
   # Stale track eviction -- frames without YOLO detection before a track is
   # evicted from confirmed_entries so absence counting can begin.
   # Keep this HIGH to avoid reacting to normal YOLO dropout on still objects.
-  stale_threshold: 6               # At 2fps -> ~6 seconds of no YOLO detection            # At 2fps -> ~6 seconds of no YOLO detection
+  stale_threshold: 6               # At 2fps -> ~6 seconds of no YOLO detection
 
 # Output Settings
 output:
