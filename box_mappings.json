@@ -2,27 +2,27 @@
   "boxes": {
     "BOX-001": [
       {
-        "track_id": 0,
-        "label": "Scissors",
-        "timestamp": 5.667,
-        "status": "in_box"
-      },
-      {
-        "track_id": 9,
-        "label": "Bottle",
-        "timestamp": 10.39,
-        "status": "in_box"
-      },
-      {
-        "track_id": 25,
-        "label": "Knife",
-        "timestamp": 16.529,
-        "status": "removed"
-      },
-      {
         "track_id": 37,
-        "label": "Mug",
-        "timestamp": 19.363,
+        "label": "Bottle",
+        "timestamp": 6.0,
+        "status": "in_box"
+      },
+      {
+        "track_id": 39,
+        "label": "Phone",
+        "timestamp": 10.999,
+        "status": "in_box"
+      },
+      {
+        "track_id": 42,
+        "label": "Apple",
+        "timestamp": 15.999,
+        "status": "in_box"
+      },
+      {
+        "track_id": 47,
+        "label": "Toothbrush",
+        "timestamp": 19.999,
         "status": "in_box"
       }
     ]
@@ -30,7 +30,7 @@
   "summary": {
     "total_boxes": 1,
     "total_items": 4,
-    "items_in_box": 3,
-    "items_removed": 1
+    "items_in_box": 4,
+    "items_removed": 0
   }
 }
