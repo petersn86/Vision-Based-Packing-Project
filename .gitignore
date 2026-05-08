@@ -1,18 +1,4 @@
-# Ignore extracted video frames
-data/frames/*
-!data/frames/.gitkeep
-data/videos/*
-!data/videos/.gitkeep
-data/yolo_frames/*
-!data/yolo_frames/.gitkeep
-uploads/*
-!uploads/.gitkeep
-
-# Ignore Generated Item List
-src/refined_item_list.txt
-
-# ----- Misc. -----
-# Byte-compiled / optimized / DLL files
+# ─── Python ───────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
@@ -22,21 +8,51 @@ venv/
 env/
 .venv/
 
-# VSCode settings
-.vscode/
-.vs/
+# ─── Generated frame data (large, ephemeral) ──────────────────────────────────
+# Raw frames extracted from each pipeline run
+data/frames/*
+!data/frames/.gitkeep
 
-# Mac system files
-.DS_Store
+# YOLO-cropped item images saved per confirmed detection
+data/yolo_frames/*
+!data/yolo_frames/.gitkeep
 
-# Logs and temporary files
-*.log
-*.tmp
+# ─── Video files ──────────────────────────────────────────────────────────────
+# Both input uploads AND the annotated output video are excluded.
+# Videos are too large for git and are regenerated on each run.
+data/videos/*
+!data/videos/.gitkeep
 
-# Extraneous
+# Flask UI video uploads
+uploads/*
+!uploads/.gitkeep
+
+# Exit-detection crop thumbnails (saved for human confirmation UI)
+data/exit_crops/*
+!data/exit_crops/.gitkeep
+
+# ─── Pipeline output files ────────────────────────────────────────────────────
+# These are regenerated every pipeline run and should not be committed.
+refined_item_list.txt
 detection_log.csv
 box_contents.json
 entry_log.json
 item_registry.json
-refined_item_list.txt
 box_mappings.json
+barcode_scan_log.json
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+*.tmp
+app.log
+
+# ─── IDE / OS metadata ────────────────────────────────────────────────────────
+.vscode/
+.vs/
+.DS_Store
+Thumbs.db
+
+# ─── Model weights ────────────────────────────────────────────────────────────
+# Large binary files — distributed separately, not stored in git.
+# Remove or comment out the lines below if your team commits weights directly.
+models/*.pt
