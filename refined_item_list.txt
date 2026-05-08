@@ -1,6 +1,6 @@
 [BOX-001]
-  item 1: "Apple"
-  item 2: "Bottle"
+  item 1: "Bottle"
+  item 2: "Mouse"
   item 3: "Phone"
-  item 4: "Toothbrush"
+  item 4: "Scissors"
 

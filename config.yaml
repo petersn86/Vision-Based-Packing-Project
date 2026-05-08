@@ -23,9 +23,9 @@ detection:
     - "box"
     - "carton"
     - "cardboard"
-  confidence_threshold: 0.50        # Raised from 0.40 (was causing too much noise)
+  confidence_threshold: 0.10
                                      # Lower than original 0.60 to catch screwdriver
-  box_confidence_threshold: 0.35
+  box_confidence_threshold: 0.60
   ignore_labels:
     - "person"
     - "people"

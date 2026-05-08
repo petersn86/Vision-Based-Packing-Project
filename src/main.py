@@ -5,18 +5,6 @@
 #
 # Description:
 # Main entry point for the Vision-Based-Packing-Project pipeline.
-#
-# MODIFIED: Replaced ByteTrack + MobileNetV2 with SimpleTracker (IOU only)
-# MODIFIED: Exit detection uses human confirmation via web UI + audio alert
-# MODIFIED: hand_detected passed to update_absences so hand_flagged is not
-#           cleared mid-pickup
-# MODIFIED: ever_hand_flagged used in end-of-video flush so items touched
-#           by a hand are always prompted even if absent_frames == 0 at EOV
-# MODIFIED: sink + large appliances added to UNCERTAIN_YOLO_LABELS to stop
-#           LLaMA hallucinating item labels from an empty box
-# MODIFIED: BarcodeScanner + BoxTracker replace BOX-001 placeholder
-# MODIFIED: box_tracker.enabled config flag; single-box barcode fallback
-# REMOVED:  QRDetector, BoxItemMapper, image_preprocessor, save_cropped_images
 ###############################################################################
 
 from video_processor                import extractFrames
@@ -54,10 +42,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # YOLO labels too generic or impossible to trust inside a packing box.
 UNCERTAIN_YOLO_LABELS = {
-    "bottle", "cell phone", "remote", "refrigerator",
+    "bottle", "refrigerator",
     "microwave", "tv", "laptop", "cup", "vase", "bowl",
-    "toothbrush", "hair drier", "scissors",
-    "knife", "fork", "spoon",
+     "hair drier", "fork", "spoon",
     "bed", "couch", "sofa", "bench",
     "dining table", "desk", "chair",
     "sink", "toilet", "bathtub", "oven", "toaster",

@@ -13,6 +13,8 @@
 # UPDATED: Added human-in-the-loop exit confirmation endpoints:
 #          GET  /exit_confirmations   — returns pending exit events for UI
 #          POST /exit_confirm/<id>    — user submits Yes/No answer
+# FIXED: Item list parser now skips box header lines ([BOX-001] etc.)
+#        so the item count and list only reflect actual detected items.
 #
 ##############################################
 
@@ -81,6 +83,37 @@ def run_cleanup():
         print(f"[WARNING] Cleanup failed (non-fatal): {e}")
 
 
+def _parse_item_list(filepath: str) -> list:
+    """
+    Parse refined_item_list.txt into a flat list of item name strings.
+
+    The file format is:
+        [BOX-001]
+          item 1: "Apple"
+          item 2: "Bottle"
+
+    We skip box header lines (starting with '[') and blank lines,
+    and return only the item label strings so the count and display
+    are accurate.
+    """
+    items = []
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            for line in f:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                # Skip box header lines like [BOX-001]
+                if stripped.startswith('[') and stripped.endswith(']'):
+                    continue
+                items.append(stripped)
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(f"[WARNING] Could not parse item list: {e}")
+    return items
+
+
 def process_video_async(video_path, job_id):
     """Process video in background thread"""
     try:
@@ -106,19 +139,10 @@ def process_video_async(video_path, job_id):
         processing_status[job_id]['message'] = 'Processing complete!'
         processing_status[job_id]['completed_at'] = datetime.now().isoformat()
 
-        # ---- FIX: Always use encoding='utf-8' when reading files ----
-        try:
-            with open('refined_item_list.txt', 'r', encoding='utf-8') as f:
-                items = [line.strip() for line in f if line.strip()]
-            processing_status[job_id]['items'] = items
-            processing_status[job_id]['item_count'] = len(items)
-        except FileNotFoundError:
-            processing_status[job_id]['items'] = []
-            processing_status[job_id]['item_count'] = 0
-        except Exception as e:
-            print(f"[WARNING] Could not read item list: {e}")
-            processing_status[job_id]['items'] = []
-            processing_status[job_id]['item_count'] = 0
+        # Parse item list — skips box headers so count is accurate
+        items = _parse_item_list('refined_item_list.txt')
+        processing_status[job_id]['items']      = items
+        processing_status[job_id]['item_count'] = len(items)
 
         # Check for output files
         processing_status[job_id]['files'] = {
@@ -255,11 +279,11 @@ def get_results(job_id):
 def download_file(file_type):
     """Download result files"""
     files = {
-        'items':       'refined_item_list.txt',
-        'log':         'detection_log.csv',
-        'video':       'data/videos/output_annotated.mp4',
-        'entry_log':   'entry_log.json',
-        'box_mappings':'box_mappings.json',
+        'items':        'refined_item_list.txt',
+        'log':          'detection_log.csv',
+        'video':        'data/videos/output_annotated.mp4',
+        'entry_log':    'entry_log.json',
+        'box_mappings': 'box_mappings.json',
     }
 
     if file_type not in files:
@@ -359,8 +383,8 @@ def health():
 
 if __name__ == '__main__':
     import sys, os
-    os.environ['PYTHONUTF8']        = '1'
-    os.environ['PYTHONIOENCODING']  = 'utf-8'
+    os.environ['PYTHONUTF8']       = '1'
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
 
     print("[INFO] Starting Vision-Based Packing Web Interface")
     print("[INFO] Access at: http://localhost:5000")

@@ -2,27 +2,27 @@
   "boxes": {
     "BOX-001": [
       {
-        "track_id": 37,
+        "track_id": 0,
         "label": "Bottle",
-        "timestamp": 6.0,
+        "timestamp": 2.938,
         "status": "in_box"
       },
       {
-        "track_id": 39,
+        "track_id": 2,
+        "label": "Scissors",
+        "timestamp": 15.67,
+        "status": "in_box"
+      },
+      {
+        "track_id": 3,
+        "label": "Mouse",
+        "timestamp": 16.65,
+        "status": "in_box"
+      },
+      {
+        "track_id": 5,
         "label": "Phone",
-        "timestamp": 10.999,
-        "status": "in_box"
-      },
-      {
-        "track_id": 42,
-        "label": "Apple",
-        "timestamp": 15.999,
-        "status": "in_box"
-      },
-      {
-        "track_id": 47,
-        "label": "Toothbrush",
-        "timestamp": 19.999,
+        "timestamp": 28.402,
         "status": "in_box"
       }
     ]
