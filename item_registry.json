@@ -5,65 +5,60 @@
       "label": "Bottle",
       "box_id": "BOX-001",
       "track_ids": [
-        37,
-        38,
-        43
+        0,
+        1,
+        4,
+        6
       ],
-      "first_frame": 6,
-      "last_frame": 17,
-      "first_ts": 6.0,
-      "last_ts": 16.999,
+      "first_frame": 3,
+      "last_frame": 40,
+      "first_ts": 2.938,
+      "last_ts": 39.176,
       "status": "in_box",
       "exit_frame": null,
       "exit_ts": null
     },
     {
       "instance_id": 2,
-      "label": "Phone",
+      "label": "Scissors",
       "box_id": "BOX-001",
       "track_ids": [
-        39,
-        40,
-        41
+        2
       ],
-      "first_frame": 11,
-      "last_frame": 12,
-      "first_ts": 10.999,
-      "last_ts": 11.999,
+      "first_frame": 16,
+      "last_frame": 16,
+      "first_ts": 15.67,
+      "last_ts": 15.67,
       "status": "in_box",
       "exit_frame": null,
       "exit_ts": null
     },
     {
       "instance_id": 3,
-      "label": "Apple",
+      "label": "Mouse",
       "box_id": "BOX-001",
       "track_ids": [
-        42,
-        44,
-        45,
-        46,
-        48
+        3
       ],
-      "first_frame": 16,
-      "last_frame": 21,
-      "first_ts": 15.999,
-      "last_ts": 20.999,
+      "first_frame": 17,
+      "last_frame": 17,
+      "first_ts": 16.65,
+      "last_ts": 16.65,
       "status": "in_box",
       "exit_frame": null,
       "exit_ts": null
     },
     {
       "instance_id": 4,
-      "label": "Toothbrush",
+      "label": "Phone",
       "box_id": "BOX-001",
       "track_ids": [
-        47
+        5
       ],
-      "first_frame": 20,
-      "last_frame": 20,
-      "first_ts": 19.999,
-      "last_ts": 19.999,
+      "first_frame": 29,
+      "last_frame": 29,
+      "first_ts": 28.402,
+      "last_ts": 28.402,
       "status": "in_box",
       "exit_frame": null,
       "exit_ts": null
@@ -76,65 +71,60 @@
         "label": "Bottle",
         "box_id": "BOX-001",
         "track_ids": [
-          37,
-          38,
-          43
+          0,
+          1,
+          4,
+          6
         ],
-        "first_frame": 6,
-        "last_frame": 17,
-        "first_ts": 6.0,
-        "last_ts": 16.999,
+        "first_frame": 3,
+        "last_frame": 40,
+        "first_ts": 2.938,
+        "last_ts": 39.176,
         "status": "in_box",
         "exit_frame": null,
         "exit_ts": null
       },
       {
         "instance_id": 2,
-        "label": "Phone",
+        "label": "Scissors",
         "box_id": "BOX-001",
         "track_ids": [
-          39,
-          40,
-          41
+          2
         ],
-        "first_frame": 11,
-        "last_frame": 12,
-        "first_ts": 10.999,
-        "last_ts": 11.999,
+        "first_frame": 16,
+        "last_frame": 16,
+        "first_ts": 15.67,
+        "last_ts": 15.67,
         "status": "in_box",
         "exit_frame": null,
         "exit_ts": null
       },
       {
         "instance_id": 3,
-        "label": "Apple",
+        "label": "Mouse",
         "box_id": "BOX-001",
         "track_ids": [
-          42,
-          44,
-          45,
-          46,
-          48
+          3
         ],
-        "first_frame": 16,
-        "last_frame": 21,
-        "first_ts": 15.999,
-        "last_ts": 20.999,
+        "first_frame": 17,
+        "last_frame": 17,
+        "first_ts": 16.65,
+        "last_ts": 16.65,
         "status": "in_box",
         "exit_frame": null,
         "exit_ts": null
       },
       {
         "instance_id": 4,
-        "label": "Toothbrush",
+        "label": "Phone",
         "box_id": "BOX-001",
         "track_ids": [
-          47
+          5
         ],
-        "first_frame": 20,
-        "last_frame": 20,
-        "first_ts": 19.999,
-        "last_ts": 19.999,
+        "first_frame": 29,
+        "last_frame": 29,
+        "first_ts": 28.402,
+        "last_ts": 28.402,
         "status": "in_box",
         "exit_frame": null,
         "exit_ts": null
@@ -146,10 +136,10 @@
     "items_in_box": 4,
     "items_removed": 0,
     "unique_labels": [
-      "Apple",
       "Bottle",
+      "Mouse",
       "Phone",
-      "Toothbrush"
+      "Scissors"
     ]
   }
 }
